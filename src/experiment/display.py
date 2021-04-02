@@ -1,3 +1,7 @@
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc
+
+
 def show_auc(lr, X, y, name=None):
     y_score = lr.decision_function(X)
     fpr = dict()

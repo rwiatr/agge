@@ -1,6 +1,11 @@
+from random import randrange
+
 import pandas as pd
+from sklearn.linear_model import LogisticRegression
+
+from experiment.display import show_auc
+from experiment.ipinyou.hash.train import train_encoder
 from experiment.ipinyou.load import read_data
-from experiment.ipinyou.agge.train import train_estimators, train_lr_and_show_results
 from experiment.measure import ProcessMeasure
 
 
@@ -38,25 +43,22 @@ if __name__ == '__main__':
         # advertiser ids
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
         ['3476'],
-        # bins
-        [1, 5, 10, 50, 150, 300],
+        # dims
+        [15, 50, 150, 300],
         # re-runs
         list(range(3)),
-        # bin type
-        ['qcut']
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
         start=0)
     print(experiments)
     prev_subject = None
     df_train, df_test = (None, None)
-    for experiment_id, (subject, bins, attempt, bin_type) in experiments:
+    for experiment_id, (subject, dims, attempt) in experiments:
 
         if subject != prev_subject:
             df_train, df_test = read_data(subject)
             df_train.drop(columns=['usertag'], inplace=True)
             df_test.drop(columns=['usertag'], inplace=True)
-
         prev_subject = subject
 
         if subject in {'1458', '3386'}:
@@ -65,15 +67,22 @@ if __name__ == '__main__':
         else:
             _df_test = neg_sample(df_test, 0.5)
             _df_train = neg_sample(df_train, 0.5)
+        dims = dims + randrange(11) - 5
 
-        __df_train, __df_test, estimators = train_estimators(_df_train, _df_test, None,
-                                                             normalize_column="minmax",
-                                                             bins=bins,
-                                                             bin_type=bin_type)
-        C = 1
-        measure.set_suffix('_None_f={}_b={}_bt={}'.format(__df_train.shape[1], bins, bin_type))
-        lr = train_lr_and_show_results(__df_train, __df_test, None, subject + '_' + str(C), measure=measure, C=C)
-        print('Done experiment id={}, adv={}, bins={}, attempt={}'.format(experiment_id, subject, bins, attempt))
+        hfe = train_encoder(_df_train, size=dims)
+        X_train = hfe.transform(_df_train).astype('float64')
+        y_train = _df_train.click.to_numpy().astype('float64')
+        X_test = hfe.transform(_df_test).astype('float64')
+        y_test = _df_test.click.to_numpy().astype('float64')
+
+        measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
+        measure.start(subject)
+        lr = LogisticRegression(random_state=0, max_iter=10000, verbose=0, solver='lbfgs').fit(X_train, y_train)
+        auc = show_auc(lr, X_test, y_test, name=subject)
+        measure.data_point(auc, collection='auc_{}'.format(subject))
+        measure.stop(subject)
+        measure.print()
+        print('Done experiment id={}, adv={}, dims={}, attempt={}'.format(experiment_id, subject, dims, attempt))
 
     print('-------------------------------- RESULT --------------------------------')
     measure.print()

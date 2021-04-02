@@ -1,1 +1,1 @@
-IPINYOU_DATA_DIR = "D://"
+IPINYOU_DATA_DIR = "/Users/rwiatr/phd/"
