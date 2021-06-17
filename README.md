@@ -1,5 +1,15 @@
 # Fast Click-Through Rate Estimation using Data Aggregates
-This repository contains code required to reproduce experiments for this paper. Please cite: TODO if used.
+This repository contains code required to reproduce experiments for this paper. If used please cite:
+```
+@inproceedings{wiatr2021fast,
+  title={Fast Click-Through Rate Estimation Using Data Aggregates},
+  author={Wiatr, Roman and S{\l}ota, Renata G and Kitowski, Jacek},
+  booktitle={International Conference on Computational Science},
+  pages={685--698},
+  year={2021},
+  organization={Springer}
+}
+```
 ## Abstract.
 Click-Through Rate estimation is a crucial prediction task in Real-Time Bidding environments prevalent in display advertising. The estimation provides information on how to trade user visits in various systems. Logistic Regression is a popular choice as the model for this task. Due to the amount, dimensionality and sparsity of data, it is challenging to train and evaluate the model. One of the techniques to reduce the training and evaluation cost is dimensionality reduction. In this work, we present Aggregate Encoding, a technique for dimensionality reduction using data aggregates. Our approach is to build aggregate-based estimators and use them as an ensemble of models weighted by logistic regression. The novelty of our work is the separation of feature values according to the value frequency, to better utilise regularization. For our experiments, we use the iPinYou data set, but this approach is universal and can be applied to other problems requiring dimensionality reduction of sparse categorical data.
 ## Setup
