@@ -1,0 +1,26 @@
+experiment_output_divNN_P:
+    - P is part
+    - NN:
+        - 10 is 0.0005  or 0.002 negative sampling
+        - 20 is 0.00025 or 0.001 negative sampling
+        - new_path = FALSE
+        - regularization:
+            cnt_train = (1 + tmp) * 0.5
+
+experiment_output_K_L_P_ES:
+    - P is part
+    - ES - extra sampling:
+        1 - no extra sampling
+        05 - 0.5 sampling
+    - new_path == True
+    - K:
+        - 2 is CTR * 2 negative sampling
+    - L=05a
+        - regularization:
+            cnt_train = (tmp - 0.5) * 1 # [-1, 1]
+    - L=1a
+        - regularization:
+            cnt_train = (tmp - 0.5) * 2 # [-1, 1]
+    - L=2a
+        - regularization:
+            cnt_train = (tmp - 0.5) * 4 # [-2, 2]
