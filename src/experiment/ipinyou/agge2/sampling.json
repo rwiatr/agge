@@ -1,0 +1,128 @@
+[
+  {
+    "advertiser": "1458",
+    "type": "train",
+    "rows": 3083056,
+    "clicks": 2454,
+    "ctr": 0.0007959634855805408
+  },
+  {
+    "advertiser": "1458",
+    "type": "test",
+    "rows": 614638,
+    "clicks": 515,
+    "ctr": 0.000837891571949668
+  },
+  {
+    "advertiser": "3358",
+    "type": "train",
+    "rows": 1742104,
+    "clicks": 1358,
+    "ctr": 0.0007795171815230319
+  },
+  {
+    "advertiser": "3358",
+    "type": "test",
+    "rows": 300928,
+    "clicks": 260,
+    "ctr": 0.000863994045087197
+  },
+  {
+    "advertiser": "3386",
+    "type": "train",
+    "rows": 2847802,
+    "clicks": 2076,
+    "ctr": 0.000728983264988226
+  },
+  {
+    "advertiser": "3386",
+    "type": "test",
+    "rows": 545421,
+    "clicks": 445,
+    "ctr": 0.0008158835101692087
+  },
+  {
+    "advertiser": "3427",
+    "type": "train",
+    "rows": 2593765,
+    "clicks": 1926,
+    "ctr": 0.0007425499226028572
+  },
+  {
+    "advertiser": "3427",
+    "type": "test",
+    "rows": 536795,
+    "clicks": 366,
+    "ctr": 0.0006818245326428152
+  },
+  {
+    "advertiser": "3476",
+    "type": "train",
+    "rows": 1970360,
+    "clicks": 1027,
+    "ctr": 0.0005212245477983719
+  },
+  {
+    "advertiser": "3476",
+    "type": "test",
+    "rows": 523848,
+    "clicks": 287,
+    "ctr": 0.0005478688474519326
+  },
+  {
+    "advertiser": "2259",
+    "type": "train",
+    "rows": 835556,
+    "clicks": 280,
+    "ctr": 0.0003351062047307422
+  },
+  {
+    "advertiser": "2259",
+    "type": "test",
+    "rows": 417197,
+    "clicks": 130,
+    "ctr": 0.000311603391203676
+  },
+  {
+    "advertiser": "2261",
+    "type": "train",
+    "rows": 687617,
+    "clicks": 207,
+    "ctr": 0.0003010396776112283
+  },
+  {
+    "advertiser": "2261",
+    "type": "test",
+    "rows": 343862,
+    "clicks": 97,
+    "ctr": 0.000282089908160832
+  },
+  {
+    "advertiser": "2821",
+    "type": "train",
+    "rows": 1322561,
+    "clicks": 843,
+    "ctr": 0.0006373997116201068
+  },
+  {
+    "advertiser": "2821",
+    "type": "test",
+    "rows": 661964,
+    "clicks": 378,
+    "ctr": 0.0005710280317358648
+  },
+  {
+    "advertiser": "2997",
+    "type": "train",
+    "rows": 312437,
+    "clicks": 1386,
+    "ctr": 0.004436094316614229
+  },
+  {
+    "advertiser": "2997",
+    "type": "test",
+    "rows": 156063,
+    "clicks": 530,
+    "ctr": 0.003396064409885751
+  }
+]
