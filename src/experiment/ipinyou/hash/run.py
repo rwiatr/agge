@@ -42,7 +42,7 @@ if __name__ == '__main__':
     experiments = generate_space([
         # advertiser ids
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
-        ['3476'],
+        ['2997'],
         # dims
         [15, 50, 150, 300],
         # re-runs
@@ -57,8 +57,18 @@ if __name__ == '__main__':
 
         if subject != prev_subject:
             df_train, df_test = read_data(subject)
+
             df_train.drop(columns=['usertag'], inplace=True)
             df_test.drop(columns=['usertag'], inplace=True)
+
+            for column in df_train.columns:
+                print(column)
+                df_train[column] = df_train[column].astype('category')
+            pd.set_option('display.max_rows', 500)
+            pd.set_option('display.max_columns', 500)
+            pd.set_option('display.width', 1000)
+            print(len(df_train.columns))
+
         prev_subject = subject
 
         if subject in {'1458', '3386'}:

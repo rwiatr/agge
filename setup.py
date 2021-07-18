@@ -13,7 +13,7 @@ setup(
     packages=find_packages(where='src'),  # Required
     python_requires='=3.8',
 
-    install_requires=['numpy', 'pandas', 'scikit-learn', 'matplotlib'],
+    install_requires=['numpy', 'pandas', 'scikit-learn', 'matplotlib', 'torch'],
 
     project_urls={
         'Paper': 'TBA',

@@ -1,3 +1,4 @@
+import json
 import time
 
 
@@ -38,6 +39,13 @@ class ProcessMeasure:
 
     def print(self):
         print('{')
-        for key in self.points.keys():
-            print("\t'{}': {}".format(key, self.points[key]))
+        keys = list(self.points.keys())
+        if len(keys) > 0:
+            for key in keys[:-1]:
+                print('\t"{}": {},'.format(key, self.points[key]))
+            key = keys[-1]
+            print('\t"{}": {}'.format(key, self.points[key]))
         print('}')
+
+    def to_json(self):
+        return json.dumps(self.points, indent=2)
