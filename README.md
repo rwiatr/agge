@@ -15,7 +15,7 @@ Click-Through Rate estimation is a crucial prediction task in Real-Time Bidding 
 ## Setup
 0. Clone this repository :)
 1. Install required libraries using [setup.py](setup.py).
-2. Download [make-ipinyou-data](https://github.com/wnzhang/https://github.com/wnzhang/make-ipinyou-data) and follow the instructions.
+2. Download [make-ipinyou-data](https://github.com/wnzhang/make-ipinyou-data) and follow the instructions.
 3. Set [IPINYOU_DATA_DIR in CONST.py](src/experiment/ipinyou/CONST.py) to point to the directory containing ```make-ipinyou-data```
 4. Run [agge/run.py](src/experiment/ipinyou/agge/run.py) for a demo of Aggregate Encoding.
 5. Run [hash/run.py](src/experiment/ipinyou/agge/run.py) for a demo of Hashing Trick
