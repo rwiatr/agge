@@ -16,6 +16,9 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
 from experiment.display_bis import show_auc
+import matplotlib.pyplot as plt
+import time
+import torch
 
 from scipy.sparse import csr_matrix
 
@@ -55,9 +58,9 @@ if __name__ == '__main__':
     experiments = generate_space([
         # advertiser ids
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
-        ['3427'],
+        ['3476'],
         # dims
-        [15, 50, 150, 300],
+        [50, 300], # 15, 50, 150, 300
         # re-runs
         list(range(3)),
     ],
@@ -65,6 +68,10 @@ if __name__ == '__main__':
         start=0)
     print(experiments)
 
+
+    sk_auc = []
+    torch_auc = []
+    elapsed_time = []
 
     prev_subject = None
     df_train, df_test = (None, None)
@@ -76,11 +83,6 @@ if __name__ == '__main__':
             df_test.drop(columns=['usertag'], inplace=True)
         prev_subject = subject
 
-
-
-
-
-
         if subject in {'1458', '3386'}:
             _df_test = neg_sample(df_test, 0.2)
             _df_train = neg_sample(df_train, 0.2)
@@ -88,8 +90,6 @@ if __name__ == '__main__':
             _df_test = neg_sample(df_test, 0.5)
             _df_train = neg_sample(df_train, 0.5)
 
-
-        
         cols = ['weekday', 'hour',  # 'timestamp',
                  'useragent', 'region', 'city', 'adexchange',
                  'slotwidth', 'slotheight',
@@ -97,6 +97,8 @@ if __name__ == '__main__':
                  'creative',  # 'bidprice', #'payprice',
                  'keypage', 'advertiser']
 
+
+        print('ENCODING...')
         enc = OneHotEncoder(handle_unknown='ignore')
         ohe = enc.fit(_df_train[cols])
 
@@ -106,26 +108,56 @@ if __name__ == '__main__':
         X_test = ohe.transform(_df_test[cols])
         y_test = _df_test.click.to_numpy().astype('float64')
 
-        print(X_train.shape, X_test.shape)
+        print('ENCODING FINISHED!')
         
         measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
         measure.start(subject)
 
+        hidden_sizes = (10,10,10)
 
         #mlp = LogisticRegression(random_state=0, max_iter=10000, verbose=0, solver='lbfgs').fit(X_train, y_train)
-        
-        #mlp = MLPClassifier(random_state=0, solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(100,50)).fit(X_train, y_train)
-        mlp = define_model(X_train.shape[1], 1, (400, 100, 100, 25))
-        train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=50, batch_size=1000)
+        print('Training sk model')
+        start = time.time()
+        mlp_sk = MLPClassifier(random_state=0, solver='adam', hidden_layer_sizes=hidden_sizes, batch_size=1000, validation_fraction=0, verbose=1).fit(X_train, y_train)
+        elapsed_time_sk = time.time() - start
+        print(f'sk model trained in {elapsed_time_sk}')
+        torch.manual_seed(0)
+        mlp = define_model(X_train.shape[1], 1, hidden_sizes)
+
+        print('Training my model')
+        start =time.time()
+        train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=6, batch_size=1000)
+        elapsed_time_torch = time.time() - start
+        print(f'My model trained in {elapsed_time_torch}')
         
         auc = show_auc(mlp, X_test, y_test, name=subject)
-        measure.data_point(auc, collection='auc_{}'.format(subject))
-        measure.stop(subject)
-        measure.print()
+        auc2 = show_auc(mlp_sk, X_test, y_test, name=subject)
+        sk_auc += [auc2]
+        torch_auc += [auc]
+        elapsed_time += [(elapsed_time_sk, elapsed_time_torch)]
+
+        #measure.data_point(auc, collection='auc_{}'.format(subject))
+        #measure.stop(subject)
+        #measure.print()
         print('Done experiment id={}, adv={}, dims={}, attempt={}'.format(experiment_id, subject, dims, attempt))
-        print(f'The result is: {auc}')
+        print(f'The result is: {auc} vs {auc2}')
     print('-------------------------------- RESULT --------------------------------')
     measure.print()
+    plt.figure()
+    plt.plot(sk_auc, label = 'sk')
+    plt.ylabel('auc')
+    plt.xlabel('model #')
+    plt.plot(torch_auc, label = 'torch')
+
+    plt.legend()
+    plt.show()
+
+    plt.figure()
+    plt.plot(elapsed_time, label=['sk', 'torch'])
+    plt.ylabel('training time')
+    plt.xlabel('model #')
+    plt.legend()
+    plt.show()
 
     '''
     

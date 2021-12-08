@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
+import torch.optim.lr_scheduler as lr_scheduler
 
 
 class Mlp(nn.Module):
@@ -57,6 +58,7 @@ class Mlp(nn.Module):
 class dataset(Dataset):
     def __init__(self,x,y):
         self.x = self.sparse_to_tensor(x)
+        #self.x = torch.tensor(x,dtype=torch.float32)
         self.y = torch.tensor(y,dtype=torch.float32)
         self.length = self.x.shape[0]
  
@@ -103,11 +105,8 @@ def prep_data(X, y, batch_size, shuffle=False):
     return DataLoader(dataset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
 def train_model(model, X, y, lr, epochs, batch_size):
+    # tensorize and batch data
     trainloader = prep_data(X, y, batch_size=batch_size)
-
-    print('============================ARE WE THERE YET??=================================')
-    print('============================ARE WE THERE YET??=================================')
-    print('============================ARE WE THERE YET??=================================')
 
     # determine a device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -116,28 +115,23 @@ def train_model(model, X, y, lr, epochs, batch_size):
     model.to(device)
  
     # loss and optimizer
+    
     loss_fn = nn.BCELoss()
-    optimizer = torch.optim.SGD(model.parameters(),lr=lr)
-
-
-    print('===============THE TRAINING IS SUPPOSED TO BE STARTING NOW======================')
-    print('===============THE TRAINING IS SUPPOSED TO BE STARTING NOW======================')
-    print('===============THE TRAINING IS SUPPOSED TO BE STARTING NOW======================')
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
 
     # training loop
-    #losses = []
+
     n_total_steps = len(trainloader)
     for epoch in range(epochs):
         loss_factor = 0
         loss_number = 0
+        train_loss = 0.0
 
         for i, (attributes, labels) in enumerate(trainloader):
             attributes = attributes.to(device)
             labels = labels.to(device)
-            
-            # sanity check
-            
-            
+
             # forward
             outputs = model(attributes)
             loss = loss_fn(outputs, labels.reshape(-1, 1))
@@ -150,12 +144,17 @@ def train_model(model, X, y, lr, epochs, batch_size):
 
             # gradient descent or adam step
             optimizer.step()
+            train_loss += loss.item()
       
-            if (i+1) % 100 == 0:
-                print()
-                print(f'epoch {epoch + 1} / {epochs}, step {i+1}/{n_total_steps}, loss = {loss:.4f}')
+            #if (i+1) % 100 == 0:
+                
+                #print(f'epoch {epoch + 1} / {epochs}, step {i+1}/{n_total_steps}, loss = {loss:.4f}')
         #losses += [loss_factor/loss_number]
-
+        curr_lr = optimizer.param_groups[0]['lr']
+        print(f'Epoch {epoch},    \
+            Training Loss: {(train_loss/loss_number):.8f}\t \
+            LR:{curr_lr}')
+        scheduler.step()
 
 if __name__ == '__main__':
     
