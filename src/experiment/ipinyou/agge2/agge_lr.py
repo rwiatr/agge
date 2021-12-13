@@ -54,7 +54,7 @@ class CustomLinearModel:
 
     def __init__(self, loss_function=loss_function, norm_weights=None,
                  X=None, Y=None, sample_weights=None, beta_init=None, train_norm_weights=False,
-                 regularization=0.00012, new_path=None):
+                 regularization=0.00012, new_path=None, a=None):
         self.regularization = regularization
         self.beta = None
         self.loss_function = loss_function
@@ -72,6 +72,8 @@ class CustomLinearModel:
         self.train_norm_weights = train_norm_weights
         self.regularization_sqrt = np.sqrt(self.regularization)
         self.new_path = new_path
+        self.a = a
+        self.first_report = True
 
     def decision_function(self, X):
         X_tmp = np.ones((X.shape[0], X.shape[1] + 1))
@@ -98,18 +100,15 @@ class CustomLinearModel:
         self.beta = beta
         beta_loss = np.array(self.beta)
 
-        if self.norm_weights is not None:
-            if self.train_norm_weights:
-                beta_loss[0:-2] *= self.norm_weights * self.beta[-1] + self.beta[-2]
-            else:
-                if self.new_path is not None:
-                    beta_loss *= self.norm_weights + self.regularization_sqrt
-                else:
-                    beta_loss *= self.norm_weights * self.regularization_sqrt
+        if self.a is not None:
+            reg = self.regularization + self.regularization * self.a * self.norm_weights
+            if self.first_report:
+                print(f'Report: a={self.a}, reg={self.regularization}, min={min(reg)}, max={max(reg)}')
+                self.first_report = False
         else:
-            beta_loss *= self.regularization_sqrt  # standard beta**2 * C
-        reg_loss = sum(beta_loss ** 2)
+            reg = self.regularization
 
+        reg_loss = sum(reg * (beta_loss ** 2))
         return (self.model_error() + reg_loss) / self.X.shape[0]
 
     def fit(self, maxiter=250):
@@ -135,3 +134,4 @@ class CustomLinearModel:
         self.beta_init = self.beta
 
         return self
+

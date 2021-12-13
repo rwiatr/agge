@@ -24,3 +24,10 @@ experiment_output_K_L_P_ES:
     - L=2a
         - regularization:
             cnt_train = (tmp - 0.5) * 4 # [-2, 2]
+(to here all is on branch * 2d1de28 - (3 days ago) normalization part 5 - Roman Wiatr (HEAD -> normalization, origin/normalization))
+
+v2:
+experiment_output_K_L_P_ES
+    all as previous apart from L:
+    now regularization is multiplied by (1 - a(1-2*normalized(n_q))) where L=a, a is from 0 (standard L2)
+    to 1 (maxed out de-regularization and over-regularization - from 0 to 2*C)

@@ -46,23 +46,36 @@ def train_lr_and_show_results(df_train, df_test, msk, subject, measure=ProcessMe
     X_test = df_test[[c for c in df_test.columns if '__p_click' in c]].to_numpy()  # ohe.transform(df_test)
     y_test = df_test.click.to_numpy().astype('int')
 
+    a = None
+    cnt_train = None
     if norm_type == 'L2+':
+        v2 = True
+
         cnt_train = np.array([float(name.split('|')[-1]) for name in df_train.columns if '|' in name])
         cnt_train = (cnt_train - cnt_train.min()) / (cnt_train.max() - cnt_train.min())
         tmp = np.zeros(cnt_train.shape[0] + 1)
         tmp[:-1] = 1 - cnt_train
         tmp[-1] = np.mean(cnt_train)
 
-        if new_path == None:
-            cnt_train = (1 + tmp) * 0.5
-        elif new_path == '05a':
-            cnt_train = (tmp - 0.5)  # [-0.5, 0.5]
-        elif new_path == '1a':
+        if v2 == True:
             cnt_train = (tmp - 0.5) * 2  # [-1, 1]
-        elif new_path == '2a':
-            cnt_train = (tmp - 0.5) * 4  # [-2, 2]
-    else:
-        cnt_train = None
+            if new_path == '0a':
+                a = 0
+            elif new_path == '1a':
+                a = 1
+            elif new_path == '05a':
+                a = 0.5
+            elif new_path == '025a':
+                a = 0.25
+        else:
+            if new_path == None:
+                cnt_train = (1 + tmp) * 0.5
+            elif new_path == '05a':
+                cnt_train = (tmp - 0.5)  # [-0.5, 0.5]
+            elif new_path == '1a':
+                cnt_train = (tmp - 0.5) * 2  # [-1, 1]
+            elif new_path == '2a':
+                cnt_train = (tmp - 0.5) * 4  # [-2, 2]
 
     measure.start(subject)
     # lr = LR2(reg_type=norm_type).fit(X_train[~msk], y_train[~msk], cnt_norm=cnt_vec)
@@ -72,7 +85,7 @@ def train_lr_and_show_results(df_train, df_test, msk, subject, measure=ProcessMe
     lr = CustomLinearModel(X=X_train, Y=y_train,
                            regularization=C if norm_type is not None else 0,
                            norm_weights=cnt_train,
-                           new_path=new_path).fit()
+                           new_path=new_path, a=a).fit()
     measure.stop(subject)
     auc = results_f(lr, X_train[~msk], y_train[~msk], X_test, y_test, subject)
     measure.data_point(auc, collection='auc_{}'.format(subject))

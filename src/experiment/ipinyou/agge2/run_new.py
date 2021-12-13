@@ -91,8 +91,8 @@ if __name__ == '__main__':
                                                              bin_type=bin_type)
 
         # experiment_output_K_L_P_ES
-        fname = 'experiment_output_K=A_L=2a_P=0_ES=01.json'
-        new_path = '2a'
+        fname = 'experiment_output_K=A_L=2a_P=0_ES=01xxx.json'
+        new_path = '0a'
         C = None
         norm_type = None
         measure.set_suffix('_None_f={}_b={}_bt={}_r=L2'.format(__df_train.shape[1], bins, bin_type))

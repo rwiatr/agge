@@ -78,7 +78,6 @@ if __name__ == '__main__':
             _df_test = neg_sample(df_test, 0.5)
             _df_train = neg_sample(df_train, 0.5)
         dims = dims + randrange(11) - 5
-
         hfe = train_encoder(_df_train, size=dims)
         X_train = hfe.transform(_df_train).astype('float64')
         y_train = _df_train.click.to_numpy().astype('float64')
@@ -87,8 +86,8 @@ if __name__ == '__main__':
 
         measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
         measure.start(subject)
-        lr = LogisticRegression(random_state=0, max_iter=10000, verbose=0, solver='lbfgs').fit(X_train, y_train)
-        auc = show_auc(lr, X_test, y_test, name=subject)
+        mlp = LogisticRegression(random_state=0, max_iter=10000, verbose=0, solver='lbfgs').fit(X_train, y_train)
+        auc = show_auc(mlp, X_test, y_test, name=subject)
         measure.data_point(auc, collection='auc_{}'.format(subject))
         measure.stop(subject)
         measure.print()
