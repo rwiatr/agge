@@ -113,7 +113,7 @@ if __name__ == '__main__':
         measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
         measure.start(subject)
 
-        hidden_sizes = (10,10,10)
+        hidden_sizes = (7,7)
 
         #mlp = LogisticRegression(random_state=0, max_iter=10000, verbose=0, solver='lbfgs').fit(X_train, y_train)
         print('Training sk model')
@@ -126,7 +126,7 @@ if __name__ == '__main__':
 
         print('Training my model')
         start =time.time()
-        train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=6, batch_size=1000)
+        train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=20, batch_size=1000)
         elapsed_time_torch = time.time() - start
         print(f'My model trained in {elapsed_time_torch}')
         
@@ -151,6 +151,7 @@ if __name__ == '__main__':
 
     plt.legend()
     plt.show()
+    plt.savefig('./model_acc.png')
 
     plt.figure()
     plt.plot(elapsed_time, label=['sk', 'torch'])
@@ -158,6 +159,7 @@ if __name__ == '__main__':
     plt.xlabel('model #')
     plt.legend()
     plt.show()
+    plt.savefig('./model_time.png')
 
     '''
     

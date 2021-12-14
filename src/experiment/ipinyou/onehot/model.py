@@ -53,13 +53,12 @@ class Mlp(nn.Module):
         return outputs.cpu().numpy()
 
 
-
-
 class dataset(Dataset):
     def __init__(self,x,y):
-        self.x = self.sparse_to_tensor(x)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.x = self.sparse_to_tensor(x).to(device)
         #self.x = torch.tensor(x,dtype=torch.float32)
-        self.y = torch.tensor(y,dtype=torch.float32)
+        self.y = torch.tensor(y,dtype=torch.float32).to(device)
         self.length = self.x.shape[0]
  
     def __getitem__(self,idx):
@@ -105,8 +104,26 @@ def prep_data(X, y, batch_size, shuffle=False):
     return DataLoader(dataset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
 def train_model(model, X, y, lr, epochs, batch_size):
+
+    patience = 5
+
+    #define model handler and early top
+    handler = ModelHandler(model, './model.bin')
+    stop = EarlyStop(patience=patience, max_epochs= epochs, handler=handler)
+
+    # train vali split
+    n = X.shape[0]
+    X_train = X[0: int(n*.9)]
+    y_train = y[0: int(n*.9)]
+    X_val = X[int(n*.9):]
+    y_val = y[int(n*.9):]
+
+    print(X_train.shape, y_train.shape)
+    print(X_val.shape, y_val.shape)
+
     # tensorize and batch data
-    trainloader = prep_data(X, y, batch_size=batch_size)
+    trainloader = prep_data(X_train, y_train, batch_size=batch_size)
+    validationloader = prep_data(X_val, y_val, batch_size=batch_size)
 
     # determine a device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -118,19 +135,21 @@ def train_model(model, X, y, lr, epochs, batch_size):
     
     loss_fn = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
-    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
+    #scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience = 5)
 
     # training loop
 
     n_total_steps = len(trainloader)
-    for epoch in range(epochs):
+    epoch = 1
+    while not stop.is_stop():
         loss_factor = 0
         loss_number = 0
         train_loss = 0.0
+        
 
+        model.train()
         for i, (attributes, labels) in enumerate(trainloader):
-            attributes = attributes.to(device)
-            labels = labels.to(device)
 
             # forward
             outputs = model(attributes)
@@ -150,11 +169,116 @@ def train_model(model, X, y, lr, epochs, batch_size):
                 
                 #print(f'epoch {epoch + 1} / {epochs}, step {i+1}/{n_total_steps}, loss = {loss:.4f}')
         #losses += [loss_factor/loss_number]
+        
+        val_loss = 0.0
+        model.eval()
+        with torch.no_grad():
+            for batch_id, (X, y) in enumerate(validationloader):
+                outputs = model(X)
+                loss = loss_fn(outputs, y.reshape(-1, 1))
+                val_loss += loss.item()
+
+        stop.update_epoch_loss(validation_loss=np.abs(val_loss/len(validationloader)), train_loss=np.abs((train_loss/loss_number)))
+
+        if stop.is_best():
+                #print(f'saving model MTL={np.abs(train_loss/loss_number)}, MVL={np.abs(val_loss/len(validationloader))}')
+                stop.handler.save(mtype='best')
+
         curr_lr = optimizer.param_groups[0]['lr']
         print(f'Epoch {epoch},    \
             Training Loss: {(train_loss/loss_number):.8f}\t \
+            Validation Loss:{(val_loss/len(validationloader)):.8f}\t \
             LR:{curr_lr}')
-        scheduler.step()
+        scheduler.step(val_loss/len(validationloader))
+        epoch += 1
+
+
+
+
+class EarlyStop:
+
+    def __init__(self, handler, patience=100, max_epochs=None):
+        self.patience = patience
+        self.best_loss = np.inf
+        self.failures = 0
+        self.epoch = 0
+        self.train_losses = []
+        self.val_losses = []
+        self.max_epochs = max_epochs if max_epochs is not None else np.inf
+        self.is_best_loss = False
+        self.handler = handler
+
+    def update_epoch_loss(self, train_loss, validation_loss):
+        self.is_best_loss = self.handler.update_epoch_loss(validation_loss)
+        self.train_losses.append(train_loss)
+        self.val_losses.append(validation_loss)
+        self.epoch += 1
+        if self.is_best_loss:
+            self.failures = 0
+            self.best_loss = validation_loss
+        else:
+            self.failures += 1
+
+    def is_best(self):
+        return self.is_best_loss
+
+    def is_stop(self):
+        return (self.failures > self.patience) or (self.epoch >= self.max_epochs)
+
+
+class ModelHandler:
+
+    def __init__(self, model, path):
+        # self.model = nn.DataParallel(model)
+        self.model = model
+        self.path = path
+        self.best_loss = np.inf
+        self.success_updates = 0
+
+    def reset(self):
+        self.best_loss = np.inf
+        self.success_updates = 0
+
+    def best(self, path=None):
+        path = path if path else self.path
+        if path is not None:
+            self.model.load_state_dict(torch.load(path + '.best.bin'))
+
+    def last(self, path=None):
+        path = path if path else self.path
+        if path is not None:
+            self.model.load_state_dict(torch.load(path + '.last.bin'))
+
+    def save(self, path=None, mtype='last'):
+        path = path if path else self.path
+        if path is not None:
+            model_path = path + '.' + mtype + '.bin'
+            torch.save(self.model.state_dict(), model_path)
+
+    def update_epoch_loss(self, loss):
+        if loss >= self.best_loss:
+            return False
+        else:
+            self.best_loss = loss
+            self.success_updates += 1
+            return True
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 if __name__ == '__main__':
     
