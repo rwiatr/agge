@@ -1,9 +1,10 @@
 import os, sys
 
+from experiment.ipinyou.nn.train import train_model__
+
 sys.path.append(os.getcwd())
 
-
-#from experiment.ipinyou.onehot.encoder import MyOneHotEncoder
+# from experiment.ipinyou.onehot.encoder import MyOneHotEncoder
 
 from random import randrange
 
@@ -23,6 +24,7 @@ import torch
 from scipy.sparse import csr_matrix
 
 from experiment.ipinyou.onehot.model import define_model, train_model
+
 
 def _generate_space(generators):
     first_generator = generators[0]
@@ -52,7 +54,6 @@ def neg_sample(df, ratio):
     return pd.concat([clicks, not_clicks.sample(int(df.shape[0] * ratio))], ignore_index=True)
 
 
-
 if __name__ == '__main__':
     measure = ProcessMeasure()
     experiments = generate_space([
@@ -60,14 +61,13 @@ if __name__ == '__main__':
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
         ['3476'],
         # dims
-        [50, 300], # 15, 50, 150, 300
+        [50, 300],  # 15, 50, 150, 300
         # re-runs
         list(range(3)),
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
         start=0)
     print(experiments)
-
 
     sk_auc = []
     torch_auc = []
@@ -91,12 +91,11 @@ if __name__ == '__main__':
             _df_train = neg_sample(df_train, 0.5)
 
         cols = ['weekday', 'hour',  # 'timestamp',
-                 'useragent', 'region', 'city', 'adexchange',
-                 'slotwidth', 'slotheight',
-                 'slotvisibility', 'slotformat', 'slotprice_bucket',  # 'slotprice',
-                 'creative',  # 'bidprice', #'payprice',
-                 'keypage', 'advertiser']
-
+                'useragent', 'region', 'city', 'adexchange',
+                'slotwidth', 'slotheight',
+                'slotvisibility', 'slotformat', 'slotprice_bucket',  # 'slotprice',
+                'creative',  # 'bidprice', #'payprice',
+                'keypage', 'advertiser']
 
         print('ENCODING...')
         enc = OneHotEncoder(handle_unknown='ignore')
@@ -104,50 +103,58 @@ if __name__ == '__main__':
 
         X_train = ohe.transform(_df_train[cols])
         y_train = _df_train.click.to_numpy().astype('float64')
-        
+
         X_test = ohe.transform(_df_test[cols])
         y_test = _df_test.click.to_numpy().astype('float64')
 
         print('ENCODING FINISHED!')
-        
+
         measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
         measure.start(subject)
 
-        hidden_sizes = (7,7)
+        hidden_sizes = (7, 7)
 
-        #mlp = LogisticRegression(random_state=0, max_iter=10000, verbose=0, solver='lbfgs').fit(X_train, y_train)
+        # mlp = LogisticRegression(random_state=0, max_iter=10000, verbose=0, solver='lbfgs').fit(X_train, y_train)
         print('Training sk model')
         start = time.time()
-        mlp_sk = MLPClassifier(random_state=0, solver='adam', hidden_layer_sizes=hidden_sizes, batch_size=1000, validation_fraction=0, verbose=1).fit(X_train, y_train)
+        mlp_sk = MLPClassifier(random_state=0, solver='adam', hidden_layer_sizes=hidden_sizes, batch_size=1000,
+                               validation_fraction=0, verbose=1).fit(X_train, y_train)
         elapsed_time_sk = time.time() - start
         print(f'sk model trained in {elapsed_time_sk}')
         torch.manual_seed(0)
         mlp = define_model(X_train.shape[1], 1, hidden_sizes)
 
+        # print('Training my model')
+        # start =time.time()
+        # train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=6, batch_size=1000)
+        # elapsed_time_torch = time.time() - start
+        # print(f'My model trained in {elapsed_time_torch}')
+
         print('Training my model')
-        start =time.time()
+        start = time.time()
         train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=20, batch_size=1000)
+
         elapsed_time_torch = time.time() - start
         print(f'My model trained in {elapsed_time_torch}')
-        
+
         auc = show_auc(mlp, X_test, y_test, name=subject)
         auc2 = show_auc(mlp_sk, X_test, y_test, name=subject)
         sk_auc += [auc2]
         torch_auc += [auc]
         elapsed_time += [(elapsed_time_sk, elapsed_time_torch)]
 
-        #measure.data_point(auc, collection='auc_{}'.format(subject))
-        #measure.stop(subject)
-        #measure.print()
+        # measure.data_point(auc, collection='auc_{}'.format(subject))
+        # measure.stop(subject)
+        # measure.print()
         print('Done experiment id={}, adv={}, dims={}, attempt={}'.format(experiment_id, subject, dims, attempt))
         print(f'The result is: {auc} vs {auc2}')
     print('-------------------------------- RESULT --------------------------------')
     measure.print()
     plt.figure()
-    plt.plot(sk_auc, label = 'sk')
+    plt.plot(sk_auc, label='sk')
     plt.ylabel('auc')
     plt.xlabel('model #')
-    plt.plot(torch_auc, label = 'torch')
+    plt.plot(torch_auc, label='torch')
 
     plt.legend()
     plt.show()
@@ -203,5 +210,3 @@ if __name__ == '__main__':
 
         w poszukiwaniu optymalnych parametrów deterministycznego modelu wzrostu wartości przedsiębiorstwa
     '''
-
-    

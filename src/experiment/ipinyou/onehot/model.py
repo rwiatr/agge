@@ -11,16 +11,16 @@ class Mlp(nn.Module):
         # input layer
         self.input_layer = nn.Linear(input_size, hidden_layers_sizes[0])
         self.relu = nn.ReLU()
-       
+
         # hidden layers
         self.linears_relus = nn.ModuleList()
-        for i in range(len(hidden_layers_sizes)-1):
-            self.linears_relus.append(nn.Linear(hidden_layers_sizes[i], hidden_layers_sizes[i+1]))
+        for i in range(len(hidden_layers_sizes) - 1):
+            self.linears_relus.append(nn.Linear(hidden_layers_sizes[i], hidden_layers_sizes[i + 1]))
             self.linears_relus.append(nn.ReLU())
 
-        #output layer
-        self.output_layer = nn.Linear(hidden_layers_sizes[-1], output_size)     
-    
+        # output layer
+        self.output_layer = nn.Linear(hidden_layers_sizes[-1], output_size)
+
     def forward(self, data_input):
         x = self.input_layer(data_input)
         x = self.relu(x)
@@ -54,15 +54,16 @@ class Mlp(nn.Module):
 
 
 class dataset(Dataset):
-    def __init__(self,x,y):
+    def __init__(self, x, y):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.x = self.sparse_to_tensor(x).to(device)
-        #self.x = torch.tensor(x,dtype=torch.float32)
-        self.y = torch.tensor(y,dtype=torch.float32).to(device)
+        # self.x = torch.tensor(x,dtype=torch.float32)
+        self.y = torch.tensor(y, dtype=torch.float32).to(device)
         self.length = self.x.shape[0]
- 
-    def __getitem__(self,idx):
-        return self.x[idx],self.y[idx]  
+
+    def __getitem__(self, idx):
+        return self.x[idx], self.y[idx]
+
     def __len__(self):
         return self.length
 
@@ -74,17 +75,16 @@ class dataset(Dataset):
         
         """
 
-        samples=data.shape[0]
-        features=data.shape[1]
-        values=data.data
-        coo_data=data.tocoo()
-        indices=torch.LongTensor([coo_data.row,coo_data.col])
-        t=torch.sparse.FloatTensor(indices,torch.from_numpy(values).float(),[samples,features])
-        t=torch.sparse_coo_tensor(data)
+        samples = data.shape[0]
+        features = data.shape[1]
+        values = data.data
+        coo_data = data.tocoo()
+        indices = torch.LongTensor([coo_data.row, coo_data.col])
+        t = torch.sparse.FloatTensor(indices, torch.from_numpy(values).float(), [samples, features])
+        t = torch.sparse_coo_tensor(data)
         return t
-    
-    def sparse_to_tensor(self, sparse_m):
 
+    def sparse_to_tensor(self, sparse_m):
         sparse_m = sparse_m.tocoo()
 
         values = sparse_m.data
@@ -94,29 +94,31 @@ class dataset(Dataset):
         v = torch.FloatTensor(values)
 
         shape = sparse_m.shape
-        
+
         return torch.sparse.FloatTensor(i, v, torch.Size(shape)).to_dense()
+
 
 def define_model(input_size, output_size, hidden_layer_sizes):
     return Mlp(input_size, output_size, hidden_layer_sizes)
 
+
 def prep_data(X, y, batch_size, shuffle=False):
     return DataLoader(dataset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
-def train_model(model, X, y, lr, epochs, batch_size):
 
+def train_model(model, X, y, lr, epochs, batch_size):
     patience = 5
 
-    #define model handler and early top
+    # define model handler and early top
     handler = ModelHandler(model, './model.bin')
-    stop = EarlyStop(patience=patience, max_epochs= epochs, handler=handler)
+    stop = EarlyStop(patience=patience, max_epochs=epochs, handler=handler)
 
     # train vali split
     n = X.shape[0]
-    X_train = X[0: int(n*.9)]
-    y_train = y[0: int(n*.9)]
-    X_val = X[int(n*.9):]
-    y_val = y[int(n*.9):]
+    X_train = X[0: int(n * .9)]
+    y_train = y[0: int(n * .9)]
+    X_val = X[int(n * .9):]
+    y_val = y[int(n * .9):]
 
     print(X_train.shape, y_train.shape)
     print(X_val.shape, y_val.shape)
@@ -128,15 +130,15 @@ def train_model(model, X, y, lr, epochs, batch_size):
     # determine a device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'The device used for training is: {device}')
-    
+
     model.to(device)
- 
+
     # loss and optimizer
-    
+
     loss_fn = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
-    #scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience = 5)
+    # scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5)
 
     # training loop
 
@@ -146,11 +148,9 @@ def train_model(model, X, y, lr, epochs, batch_size):
         loss_factor = 0
         loss_number = 0
         train_loss = 0.0
-        
 
         model.train()
         for i, (attributes, labels) in enumerate(trainloader):
-
             # forward
             outputs = model(attributes)
             loss = loss_fn(outputs, labels.reshape(-1, 1))
@@ -164,12 +164,12 @@ def train_model(model, X, y, lr, epochs, batch_size):
             # gradient descent or adam step
             optimizer.step()
             train_loss += loss.item()
-      
-            #if (i+1) % 100 == 0:
-                
-                #print(f'epoch {epoch + 1} / {epochs}, step {i+1}/{n_total_steps}, loss = {loss:.4f}')
-        #losses += [loss_factor/loss_number]
-        
+
+            # if (i+1) % 100 == 0:
+
+            # print(f'epoch {epoch + 1} / {epochs}, step {i+1}/{n_total_steps}, loss = {loss:.4f}')
+        # losses += [loss_factor/loss_number]
+
         val_loss = 0.0
         model.eval()
         with torch.no_grad():
@@ -178,21 +178,20 @@ def train_model(model, X, y, lr, epochs, batch_size):
                 loss = loss_fn(outputs, y.reshape(-1, 1))
                 val_loss += loss.item()
 
-        stop.update_epoch_loss(validation_loss=np.abs(val_loss/len(validationloader)), train_loss=np.abs((train_loss/loss_number)))
+        stop.update_epoch_loss(validation_loss=np.abs(val_loss / len(validationloader)),
+                               train_loss=np.abs((train_loss / loss_number)))
 
         if stop.is_best():
-                #print(f'saving model MTL={np.abs(train_loss/loss_number)}, MVL={np.abs(val_loss/len(validationloader))}')
-                stop.handler.save(mtype='best')
+            # print(f'saving model MTL={np.abs(train_loss/loss_number)}, MVL={np.abs(val_loss/len(validationloader))}')
+            stop.handler.save(mtype='best')
 
         curr_lr = optimizer.param_groups[0]['lr']
         print(f'Epoch {epoch},    \
-            Training Loss: {(train_loss/loss_number):.8f}\t \
-            Validation Loss:{(val_loss/len(validationloader)):.8f}\t \
+            Training Loss: {(train_loss / loss_number):.8f}\t \
+            Validation Loss:{(val_loss / len(validationloader)):.8f}\t \
             LR:{curr_lr}')
-        scheduler.step(val_loss/len(validationloader))
+        scheduler.step(val_loss / len(validationloader))
         epoch += 1
-
-
 
 
 class EarlyStop:
@@ -264,24 +263,7 @@ class ModelHandler:
             return True
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 if __name__ == '__main__':
-    
     X = np.random.rand(986207, 561)
     y = np.random.randint(2, size=986207)
 
@@ -289,8 +271,8 @@ if __name__ == '__main__':
     yt = np.random.randint(2, size=262211)
 
     mlp = define_model(input_size=X.shape[1], output_size=1, hidden_layer_sizes=(10, 15, 7))
-    train_model(model = mlp, X=X, y=y, lr=1e-5, epochs=3, batch_size=500)    
-    
+    train_model(model=mlp, X=X, y=y, lr=1e-5, epochs=3, batch_size=500)
+
     predictions = mlp.decision_function(Xt)
     print(predictions.shape)
     print(predictions)
