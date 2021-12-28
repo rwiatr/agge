@@ -4,6 +4,8 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import torch.optim.lr_scheduler as lr_scheduler
 
+from experiment.display_bis import show_auc
+
 
 class Mlp(nn.Module):
     def __init__(self, input_size, output_size, hidden_layers_sizes):
@@ -106,19 +108,19 @@ def prep_data(X, y, batch_size, shuffle=False):
     return DataLoader(dataset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
 
-def train_model(model, X, y, lr, epochs, batch_size):
-    patience = 5
-
+def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience=5, stabilization=0,
+                validation_fraction=0.1, tol=0):
     # define model handler and early top
-    handler = ModelHandler(model, './model.bin')
-    stop = EarlyStop(patience=patience, max_epochs=epochs, handler=handler)
+    handler = ModelHandler(model, './model')
+    stop = EarlyStop(patience=patience, max_epochs=epochs, handler=handler, tol=tol)
 
+    perut = torch.randperm(X.shape[0])
     # train vali split
     n = X.shape[0]
-    X_train = X[0: int(n * .9)]
-    y_train = y[0: int(n * .9)]
-    X_val = X[int(n * .9):]
-    y_val = y[int(n * .9):]
+    X_train = X[perut][0: int(n * (1 - validation_fraction))]
+    y_train = y[perut][0: int(n * (1 - validation_fraction))]
+    X_val = X[perut][int(n * (1 - validation_fraction)):]
+    y_val = y[perut][int(n * (1 - validation_fraction)):]
 
     print(X_train.shape, y_train.shape)
     print(X_val.shape, y_val.shape)
@@ -136,17 +138,17 @@ def train_model(model, X, y, lr, epochs, batch_size):
     # loss and optimizer
 
     loss_fn = nn.BCELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    nn.L1Loss
     # scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience // 3, factor=0.5)
 
     # training loop
 
     n_total_steps = len(trainloader)
     epoch = 1
     while not stop.is_stop():
-        loss_factor = 0
-        loss_number = 0
+        train_steps = 0
         train_loss = 0.0
 
         model.train()
@@ -154,8 +156,6 @@ def train_model(model, X, y, lr, epochs, batch_size):
             # forward
             outputs = model(attributes)
             loss = loss_fn(outputs, labels.reshape(-1, 1))
-            loss_factor += loss.item()
-            loss_number += 1
 
             # backprop
             optimizer.zero_grad()
@@ -164,39 +164,44 @@ def train_model(model, X, y, lr, epochs, batch_size):
             # gradient descent or adam step
             optimizer.step()
             train_loss += loss.item()
-
-            # if (i+1) % 100 == 0:
-
-            # print(f'epoch {epoch + 1} / {epochs}, step {i+1}/{n_total_steps}, loss = {loss:.4f}')
-        # losses += [loss_factor/loss_number]
+            train_steps += 1
 
         val_loss = 0.0
         model.eval()
+        val_steps = 0
         with torch.no_grad():
             for batch_id, (X, y) in enumerate(validationloader):
                 outputs = model(X)
                 loss = loss_fn(outputs, y.reshape(-1, 1))
                 val_loss += loss.item()
+                val_steps += 1
 
-        stop.update_epoch_loss(validation_loss=np.abs(val_loss / len(validationloader)),
-                               train_loss=np.abs((train_loss / loss_number)))
+        if stabilization > 0:
+            stabilization -= 1
+        else:
+            stop.update_epoch_loss(validation_loss=np.abs(val_loss / val_steps),
+                                   train_loss=np.abs(train_loss / train_steps))
 
-        if stop.is_best():
-            # print(f'saving model MTL={np.abs(train_loss/loss_number)}, MVL={np.abs(val_loss/len(validationloader))}')
-            stop.handler.save(mtype='best')
+            handler.save(mtype='last')
+            if stop.is_best():
+                handler.save(mtype='best')
 
         curr_lr = optimizer.param_groups[0]['lr']
         print(f'Epoch {epoch},    \
-            Training Loss: {(train_loss / loss_number):.8f}\t \
-            Validation Loss:{(val_loss / len(validationloader)):.8f}\t \
+            Training Loss: {train_loss / train_steps:.8f}\t \
+            Training Steps: {train_steps}\t \
+            Validation Loss:{val_loss / val_steps:.8f}\t \
+            Validation Steps:{val_steps}\t \
             LR:{curr_lr}')
-        scheduler.step(val_loss / len(validationloader))
+        scheduler.step(val_loss)
         epoch += 1
+
+    return handler
 
 
 class EarlyStop:
 
-    def __init__(self, handler, patience=100, max_epochs=None):
+    def __init__(self, handler, patience=100, max_epochs=None, tol=0):
         self.patience = patience
         self.best_loss = np.inf
         self.failures = 0
@@ -206,15 +211,24 @@ class EarlyStop:
         self.max_epochs = max_epochs if max_epochs is not None else np.inf
         self.is_best_loss = False
         self.handler = handler
+        self.tol = tol
+        self.tol_problem = False
 
     def update_epoch_loss(self, train_loss, validation_loss):
         self.is_best_loss = self.handler.update_epoch_loss(validation_loss)
         self.train_losses.append(train_loss)
         self.val_losses.append(validation_loss)
         self.epoch += 1
+        if len(self.val_losses) > 1:
+            self.tol_problem = abs(self.val_losses[-2] - self.val_losses[-1]) < self.tol
+
         if self.is_best_loss:
-            self.failures = 0
+            print('updating best model')
             self.best_loss = validation_loss
+            if self.tol_problem:
+                self.failures += 1
+            else:
+                self.failures = 0
         else:
             self.failures += 1
 
@@ -228,7 +242,6 @@ class EarlyStop:
 class ModelHandler:
 
     def __init__(self, model, path):
-        # self.model = nn.DataParallel(model)
         self.model = model
         self.path = path
         self.best_loss = np.inf
@@ -241,12 +254,12 @@ class ModelHandler:
     def best(self, path=None):
         path = path if path else self.path
         if path is not None:
-            self.model.load_state_dict(torch.load(path + '.best.bin'))
+            self.model.load_state_dict(torch.load(path + '.best.bin'), strict=True)
 
     def last(self, path=None):
         path = path if path else self.path
         if path is not None:
-            self.model.load_state_dict(torch.load(path + '.last.bin'))
+            self.model.load_state_dict(torch.load(path + '.last.bin'), strict=True)
 
     def save(self, path=None, mtype='last'):
         path = path if path else self.path

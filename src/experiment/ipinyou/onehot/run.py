@@ -1,6 +1,8 @@
 import os, sys
 
+from experiment.ipinyou.nn import simple
 from experiment.ipinyou.nn.train import train_model__
+from experiment.ipinyou.onehot.algo import SKLearnMLPRunner, SKLearnLRRunner, MLPRunner
 
 sys.path.append(os.getcwd())
 
@@ -59,11 +61,15 @@ if __name__ == '__main__':
     experiments = generate_space([
         # advertiser ids
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
-        ['3476'],
+        ['3476', '2259'],
         # dims
-        [50, 300],  # 15, 50, 150, 300
+        # [50, 300],  # 15, 50, 150, 300
+        # alpha
+        [0.000001, 0.0001, 0.01],
+        # hidden
+        [4, 32],
         # re-runs
-        list(range(3)),
+        list(range(15)),
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
         start=0)
@@ -75,8 +81,14 @@ if __name__ == '__main__':
 
     prev_subject = None
     df_train, df_test = (None, None)
-    for experiment_id, (subject, dims, attempt) in experiments:
 
+    sk_learn_mlp = SKLearnMLPRunner().set_measure(measure)
+    sk_learn_lr = SKLearnLRRunner().set_measure(measure)
+    mlp = MLPRunner().set_measure(measure)
+    use_bck = False
+
+    for experiment_id, (subject, alpha, hidden, attempt) in experiments:
+        # if not use_bck:
         if subject != prev_subject:
             df_train, df_test = read_data(subject)
             df_train.drop(columns=['usertag'], inplace=True)
@@ -89,6 +101,11 @@ if __name__ == '__main__':
         else:
             _df_test = neg_sample(df_test, 0.5)
             _df_train = neg_sample(df_train, 0.5)
+        #     _df_test.to_pickle("/tmp/test.bkp")
+        #     _df_train.to_pickle("/tmp/train.bkp")
+        # else:
+        #     _df_test = pd.read_pickle("/tmp/test.bkp")
+        #     _df_train = pd.read_pickle("/tmp/train.bkp")
 
         cols = ['weekday', 'hour',  # 'timestamp',
                 'useragent', 'region', 'city', 'adexchange',
@@ -109,20 +126,47 @@ if __name__ == '__main__':
 
         print('ENCODING FINISHED!')
 
-        measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
-        measure.start(subject)
+        # measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
+        # measure.start(subject)
 
-        hidden_sizes = (7, 7)
+        hidden_sizes = (hidden, 7)
 
-        # mlp = LogisticRegression(random_state=0, max_iter=10000, verbose=0, solver='lbfgs').fit(X_train, y_train)
-        print('Training sk model')
-        start = time.time()
-        mlp_sk = MLPClassifier(random_state=0, solver='adam', hidden_layer_sizes=hidden_sizes, batch_size=1000,
-                               validation_fraction=0, verbose=1).fit(X_train, y_train)
-        elapsed_time_sk = time.time() - start
-        print(f'sk model trained in {elapsed_time_sk}')
-        torch.manual_seed(0)
-        mlp = define_model(X_train.shape[1], 1, hidden_sizes)
+        nn_params = {
+            "hidden_layer_sizes": hidden_sizes,
+            # "activation":"relu",
+            # "solver":'adam',
+            "alpha": alpha,  # 0.000001,
+            "batch_size": 1000,
+            # "learning_rate": "constant",
+            "learning_rate_init": 0.001,
+            # "power_t": 0.5,
+            "max_iter": 100,  # implement
+            # "shuffle": True, # always true
+            "validation_fraction": 0.1,  # implement
+            # "random_state":None,
+            "tol": 1e-4,  # implement OR make sure its low
+            # "warm_start": False,
+            # "momentum": 0.9,
+            # "nesterovs_momentum": True,
+            # "early_stopping": True,  # should be always true
+            # "beta_1": 0.9, "beta_2": 0.999,
+            # "epsilon": 1e-8, "n_iter_no_change": 10, "max_fun": 15000
+            "n_iter_no_change": 10
+        }
+        print(1. / alpha / 1000000)
+        sk_learn_lr.run({"train": X_train, "test": X_test},
+                        {"train": y_train, "test": y_test},
+                        subject,
+                        random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
+        sk_learn_mlp.run({"train": X_train, "test": X_test},
+                         {"train": y_train, "test": y_test},
+                         subject,
+                         **nn_params)
+        mlp.run({"train": X_train, "test": X_test},
+                {"train": y_train, "test": y_test},
+                subject,
+                **nn_params)
+        # mlp = define_model(X_train.shape[1], 1, hidden_sizes)
 
         # print('Training my model')
         # start =time.time()
@@ -130,26 +174,30 @@ if __name__ == '__main__':
         # elapsed_time_torch = time.time() - start
         # print(f'My model trained in {elapsed_time_torch}')
 
-        print('Training my model')
-        start = time.time()
-        train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=20, batch_size=1000)
+        # print('Training my model')
+        # start = time.time()
+        # train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=20, batch_size=1000)
+        #
+        # elapsed_time_torch = time.time() - start
+        # print(f'My model trained in {elapsed_time_torch}')
 
-        elapsed_time_torch = time.time() - start
-        print(f'My model trained in {elapsed_time_torch}')
-
-        auc = show_auc(mlp, X_test, y_test, name=subject)
-        auc2 = show_auc(mlp_sk, X_test, y_test, name=subject)
-        sk_auc += [auc2]
-        torch_auc += [auc]
-        elapsed_time += [(elapsed_time_sk, elapsed_time_torch)]
+        # auc = show_auc(mlp, X_test, y_test, name=subject)
+        # auc2 = show_auc(mlp_sk, X_test, y_test, name=subject)
+        # sk_auc += [auc2]
+        # torch_auc += [auc]
+        # elapsed_time += [(elapsed_time_sk, elapsed_time_torch)]
 
         # measure.data_point(auc, collection='auc_{}'.format(subject))
         # measure.stop(subject)
         # measure.print()
-        print('Done experiment id={}, adv={}, dims={}, attempt={}'.format(experiment_id, subject, dims, attempt))
-        print(f'The result is: {auc} vs {auc2}')
+        # print('Done experiment id={}, adv={}, dims={}, attempt={}'.format(experiment_id, subject, dims, attempt))
+        # print(f'The result is: {auc} vs {auc2}')
+        # measure.to_pandas().to_pickle(f"results_{attempt % 5}.pickle")
+
     print('-------------------------------- RESULT --------------------------------')
     measure.print()
+    measure.to_pandas().to_pickle("results.pickle")
+    print(measure.to_pandas())
     plt.figure()
     plt.plot(sk_auc, label='sk')
     plt.ylabel('auc')
