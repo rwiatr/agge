@@ -2,14 +2,15 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
+import os
 import torch.optim.lr_scheduler as lr_scheduler
 
 
 class Mlp(nn.Module):
-    def __init__(self, input_size, output_size, hidden_layers_sizes):
+    def __init__(self, input_size, output_size, hidden_layers_sizes, bias=False):
         super(Mlp, self).__init__()
         # input layer
-        self.input_layer = nn.Linear(input_size, hidden_layers_sizes[0])
+        self.input_layer = nn.Linear(input_size, hidden_layers_sizes[0], bias=bias)
         self.relu = nn.ReLU()
        
         # hidden layers
@@ -53,7 +54,7 @@ class Mlp(nn.Module):
         return outputs.cpu().numpy()
 
 
-class dataset(Dataset):
+class _Dataset(Dataset):
     def __init__(self,x,y):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.x = self.sparse_to_tensor(x).to(device)
@@ -97,18 +98,18 @@ class dataset(Dataset):
         
         return torch.sparse.FloatTensor(i, v, torch.Size(shape)).to_dense()
 
-def define_model(input_size, output_size, hidden_layer_sizes):
-    return Mlp(input_size, output_size, hidden_layer_sizes)
+def define_model(input_size, output_size, hidden_layer_sizes, bias):
+    return Mlp(input_size, output_size, hidden_layer_sizes, bias)
 
 def prep_data(X, y, batch_size, shuffle=False):
-    return DataLoader(dataset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
+    return DataLoader(_Dataset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
-def train_model(model, X, y, lr, epochs, batch_size):
+def train_model(model, X, y, lr, epochs, batch_size, patience):
 
-    patience = 5
+    patience = patience
 
     #define model handler and early top
-    handler = ModelHandler(model, './model.bin')
+    handler = ModelHandler(model, './model-ohe')
     stop = EarlyStop(patience=patience, max_epochs= epochs, handler=handler)
 
     # train vali split
@@ -129,14 +130,14 @@ def train_model(model, X, y, lr, epochs, batch_size):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'The device used for training is: {device}')
     
-    model.to(device)
+    model = model.to(device)
  
     # loss and optimizer
     
     loss_fn = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     #scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience = 5)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience = 3)
 
     # training loop
 
@@ -147,7 +148,6 @@ def train_model(model, X, y, lr, epochs, batch_size):
         loss_number = 0
         train_loss = 0.0
         
-
         model.train()
         for i, (attributes, labels) in enumerate(trainloader):
 
@@ -164,11 +164,6 @@ def train_model(model, X, y, lr, epochs, batch_size):
             # gradient descent or adam step
             optimizer.step()
             train_loss += loss.item()
-      
-            #if (i+1) % 100 == 0:
-                
-                #print(f'epoch {epoch + 1} / {epochs}, step {i+1}/{n_total_steps}, loss = {loss:.4f}')
-        #losses += [loss_factor/loss_number]
         
         val_loss = 0.0
         model.eval()
@@ -181,7 +176,6 @@ def train_model(model, X, y, lr, epochs, batch_size):
         stop.update_epoch_loss(validation_loss=np.abs(val_loss/len(validationloader)), train_loss=np.abs((train_loss/loss_number)))
 
         if stop.is_best():
-                #print(f'saving model MTL={np.abs(train_loss/loss_number)}, MVL={np.abs(val_loss/len(validationloader))}')
                 stop.handler.save(mtype='best')
 
         curr_lr = optimizer.param_groups[0]['lr']
@@ -191,9 +185,9 @@ def train_model(model, X, y, lr, epochs, batch_size):
             LR:{curr_lr}')
         scheduler.step(val_loss/len(validationloader))
         epoch += 1
-
-
-
+    if os.path.isfile('./model-ohe.best.bin'):
+        model.load_state_dict(torch.load('./model-ohe.best.bin'))
+    return model
 
 class EarlyStop:
 

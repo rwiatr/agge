@@ -9,6 +9,7 @@ from random import randrange
 
 import pandas as pd
 import numpy as np
+import seaborn as sns
 from experiment.ipinyou.load import read_data
 from experiment.measure import ProcessMeasure
 from experiment.ipinyou.onehot.train import train_encoder
@@ -60,7 +61,7 @@ if __name__ == '__main__':
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
         ['3476'],
         # dims
-        [50, 300], # 15, 50, 150, 300
+        [15, 50, 150, 300], # 15, 50, 150, 300
         # re-runs
         list(range(3)),
     ],
@@ -69,9 +70,8 @@ if __name__ == '__main__':
     print(experiments)
 
 
-    sk_auc = []
-    torch_auc = []
-    elapsed_time = []
+    auc_results = []
+    time_results = []
 
     prev_subject = None
     df_train, df_test = (None, None)
@@ -97,7 +97,14 @@ if __name__ == '__main__':
                  'creative',  # 'bidprice', #'payprice',
                  'keypage', 'advertiser']
 
+        #OPTIONS
+        hidden_sizes = (7, 7, 7)
+        BATCH_SIZE = 500
+        PATIENCE = 7
+        EPOCHS = 30
+        LR = 0.0001
 
+        ## OHE 
         print('ENCODING...')
         enc = OneHotEncoder(handle_unknown='ignore')
         ohe = enc.fit(_df_train[cols])
@@ -107,59 +114,58 @@ if __name__ == '__main__':
         
         X_test = ohe.transform(_df_test[cols])
         y_test = _df_test.click.to_numpy().astype('float64')
-
         print('ENCODING FINISHED!')
-        
-        measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
-        measure.start(subject)
 
-        hidden_sizes = (7,7)
-
-        #mlp = LogisticRegression(random_state=0, max_iter=10000, verbose=0, solver='lbfgs').fit(X_train, y_train)
+        ## define and train sklearn MLP model
         print('Training sk model')
         start = time.time()
-        mlp_sk = MLPClassifier(random_state=0, solver='adam', hidden_layer_sizes=hidden_sizes, batch_size=1000, validation_fraction=0, verbose=1).fit(X_train, y_train)
+        mlp_sk = MLPClassifier(random_state=0, solver='adam', hidden_layer_sizes=hidden_sizes, batch_size=BATCH_SIZE, validation_fraction=0.1, verbose=1).fit(X_train, y_train)
         elapsed_time_sk = time.time() - start
         print(f'sk model trained in {elapsed_time_sk}')
-        torch.manual_seed(0)
-        mlp = define_model(X_train.shape[1], 1, hidden_sizes)
 
+        ## define and train my MLP model w/o embedding
+        mlp = define_model(X_train.shape[1], 1, hidden_sizes, bias=True)
         print('Training my model')
         start =time.time()
-        train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=20, batch_size=1000)
+        mlp = train_model(model=mlp, X=X_train, y=y_train, lr=LR, epochs=EPOCHS, batch_size=BATCH_SIZE, patience=PATIENCE)
         elapsed_time_torch = time.time() - start
         print(f'My model trained in {elapsed_time_torch}')
+
+        ## define and train my MLP model with embedding
+        mlp_emb = define_model(X_train.shape[1], 1, hidden_sizes, bias=False)
+        print('Training my model')
+        start = time.time()
+        mlp_emb = train_model(model=mlp_emb, X=X_train, y=y_train, lr=LR, epochs=EPOCHS, batch_size=BATCH_SIZE, patience=PATIENCE)
+        elapsed_time_torch_emb = time.time() - start
+        print(f'My model trained in {elapsed_time_torch_emb}')
+
+
+        auc_mlp = show_auc(mlp, X_test, y_test, name=subject)
+        auc_sk = show_auc(mlp_sk, X_test, y_test, name=subject)
+        auc_emb = show_auc(mlp_emb, X_test, y_test, name=subject)
         
-        auc = show_auc(mlp, X_test, y_test, name=subject)
-        auc2 = show_auc(mlp_sk, X_test, y_test, name=subject)
-        sk_auc += [auc2]
-        torch_auc += [auc]
-        elapsed_time += [(elapsed_time_sk, elapsed_time_torch)]
-
-        #measure.data_point(auc, collection='auc_{}'.format(subject))
-        #measure.stop(subject)
-        #measure.print()
-        print('Done experiment id={}, adv={}, dims={}, attempt={}'.format(experiment_id, subject, dims, attempt))
-        print(f'The result is: {auc} vs {auc2}')
-    print('-------------------------------- RESULT --------------------------------')
+        auc_results += [(auc_mlp, auc_sk, auc_emb)]
+        time_results += [(elapsed_time_torch, elapsed_time_sk, elapsed_time_torch_emb)]    
+        print('-------------------------------- RESULT --------------------------------')
+    
     measure.print()
+
+
+    ### plotting auc and time 
+
     plt.figure()
-    plt.plot(sk_auc, label = 'sk')
+    ax = sns.boxplot(data=pd.DataFrame(auc_results, columns=['torch', 'sk', 'torch_emb']))
     plt.ylabel('auc')
-    plt.xlabel('model #')
-    plt.plot(torch_auc, label = 'torch')
-
-    plt.legend()
+    plt.xlabel('tool')
     plt.show()
-    plt.savefig('./model_acc.png')
+    plt.savefig('./model_box_acc.png')
 
     plt.figure()
-    plt.plot(elapsed_time, label=['sk', 'torch'])
+    ax = sns.boxplot(data=pd.DataFrame(time_results, columns=['torch', 'sk', 'torch_emb']))
     plt.ylabel('training time')
-    plt.xlabel('model #')
-    plt.legend()
+    plt.xlabel('Tool')
     plt.show()
-    plt.savefig('./model_time.png')
+    plt.savefig('./model_box_time.png')
 
     '''
     
