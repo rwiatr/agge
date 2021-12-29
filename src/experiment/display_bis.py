@@ -13,7 +13,7 @@ def show_auc(clf, X, y, name=None):
         fpr["micro"], tpr["micro"], _ = roc_curve(y.ravel(), y_score.ravel())
         fpr["micro"], tpr["micro"], _ = roc_curve(y.ravel(), y_score.ravel())
         roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
-
+        '''
         plt.figure()
         lw = 2
         plt.plot(fpr['micro'], tpr['micro'], color='darkorange',
@@ -28,8 +28,12 @@ def show_auc(clf, X, y, name=None):
         else:
             plt.title('Receiver operating characteristic for {}'.format(name))
         plt.legend(loc="lower right")
-        plt.show()
+        #plt.show()
 
+        
+        '''
+
+        
         return roc_auc['micro'] * 100
     else:
         ns_proba = [0 for _ in range(len(y))]
@@ -45,6 +49,10 @@ def show_auc(clf, X, y, name=None):
         ns_fpr, ns_tpr, _ = roc_curve(y, ns_proba)
         lr_fpr, lr_tpr, _ = roc_curve(y, y_proba)
         # plot the roc curve for the model
+
+
+        '''
+
         if name is None:
             plt.title(f'Receiver operating characteristic')
         else:
@@ -57,7 +65,10 @@ def show_auc(clf, X, y, name=None):
         # show the legend
         plt.legend()
         # show the plot
-        plt.show()
+        #plt.show()
+
+
+        '''
         
         return lr_auc * 100
 
