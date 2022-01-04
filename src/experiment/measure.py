@@ -1,5 +1,5 @@
 import time
-
+import pandas as pd
 
 class TimeDelta:
     start_sec = None
@@ -15,7 +15,6 @@ class TimeDelta:
 
     def delta(self):
         return self.end_sec - self.start_sec
-
 
 class ProcessMeasure:
     def __init__(self):
@@ -41,3 +40,22 @@ class ProcessMeasure:
         for key in self.points.keys():
             print("\t'{}': {}".format(key, self.points[key]))
         print('}')
+
+    def merge(self, other):
+        new = ProcessMeasure()
+        new.deltas = {**self.deltas, **other.deltas}
+        new.points = {**self.points, **other.points}
+        return new
+
+    def to_pandas(self):
+        def as_dict(dictionary):
+            for key in dictionary.keys():
+                keys = key.split("_::")
+                type_ = keys[0]
+                to_parse = keys[1]
+                yield {"measure_type": type_, "value": dictionary[key],
+                       **{p.split("=")[0]: p.split("=")[1] for p in to_parse.split(';')}}
+
+
+
+        return pd.DataFrame.from_records([d for d in as_dict(self.points)])
