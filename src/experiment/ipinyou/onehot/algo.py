@@ -32,8 +32,8 @@ class AlgoRunner:
         return {"NA": 0}
 
     def to_auc(self, model, subject, X, y):
-        return {"train": show_auc(model, X['train'], y['train'], name="Train " + subject + " " + self.name),
-                "test": show_auc(model, X['test'], y['test'], name="Test " + subject + " " + self.name)}
+        return {"train": show_auc(model, X['train'], y['train'], name="Train " + subject + " " + self.name, plot=False),
+                "test": show_auc(model, X['test'], y['test'], name="Test " + subject + " " + self.name, plot=False)}
 
 
 class SKLearnMLPRunner(AlgoRunner):

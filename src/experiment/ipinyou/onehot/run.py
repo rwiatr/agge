@@ -1,5 +1,6 @@
 import os, sys
 
+from experiment.ipinyou.agge.agge_handle import AggeHandle
 from experiment.ipinyou.nn import simple
 from experiment.ipinyou.nn.train import train_model__
 from experiment.ipinyou.onehot.algo import SKLearnMLPRunner, SKLearnLRRunner, MLPRunner
@@ -61,9 +62,9 @@ if __name__ == '__main__':
     experiments = generate_space([
         # advertiser ids
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
-        ['3476', '2259'],
-        # dims
-        # [50, 300],  # 15, 50, 150, 300
+        ['2261', '2821', '2997'],
+        # bins
+        [1, 5, 10, 50, 150, 300],
         # alpha
         [0.000001, 0.0001, 0.01],
         # hidden
@@ -87,7 +88,7 @@ if __name__ == '__main__':
     mlp = MLPRunner().set_measure(measure)
     use_bck = False
 
-    for experiment_id, (subject, alpha, hidden, attempt) in experiments:
+    for experiment_id, (subject, bins, alpha, hidden, attempt) in experiments:
         # if not use_bck:
         if subject != prev_subject:
             df_train, df_test = read_data(subject)
@@ -124,12 +125,14 @@ if __name__ == '__main__':
         X_test = ohe.transform(_df_test[cols])
         y_test = _df_test.click.to_numpy().astype('float64')
 
+        print('AGGE ENCODING ...')
+
+        agge_handler = AggeHandle(bins=bins)
+        X_train_agge, X_test_agge = \
+            agge_handler.fit_and_convert(_df_train[cols + ['click']], _df_test[cols + ['click']])
         print('ENCODING FINISHED!')
-
-        # measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
-        # measure.start(subject)
-
-        hidden_sizes = (hidden, 7)
+        print("feature size of agge", X_train_agge.shape[1])
+        hidden_sizes = (hidden, 8)
 
         nn_params = {
             "hidden_layer_sizes": hidden_sizes,
@@ -154,49 +157,38 @@ if __name__ == '__main__':
             "n_iter_no_change": 10
         }
         print(1. / alpha / 1000000)
-        sk_learn_lr.run({"train": X_train, "test": X_test},
+        # sk_learn_lr.run({"train": X_train, "test": X_test},
+        #                 {"train": y_train, "test": y_test},
+        #                 subject + f";encoding=oh;features={X_train.shape[1]}",
+        #                 random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
+        # sk_learn_mlp.run({"train": X_train, "test": X_test},
+        #                  {"train": y_train, "test": y_test},
+        #                  subject + f";encoding=oh;features={X_train.shape[1]}",
+        #                  **nn_params)
+        # mlp.run({"train": X_train, "test": X_test},
+        #         {"train": y_train, "test": y_test},
+        #         subject + f";encoding=oh;features={X_train.shape[1]}",
+        #         **nn_params)
+
+        sk_learn_lr.run({"train": X_train_agge, "test": X_test_agge},
                         {"train": y_train, "test": y_test},
-                        subject,
+                        subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
                         random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
-        sk_learn_mlp.run({"train": X_train, "test": X_test},
+        sk_learn_mlp.run({"train": X_train_agge, "test": X_test_agge},
                          {"train": y_train, "test": y_test},
-                         subject,
+                         subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
                          **nn_params)
-        mlp.run({"train": X_train, "test": X_test},
+        mlp.run({"train": X_train_agge, "test": X_test_agge},
                 {"train": y_train, "test": y_test},
-                subject,
+                subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
                 **nn_params)
-        # mlp = define_model(X_train.shape[1], 1, hidden_sizes)
 
-        # print('Training my model')
-        # start =time.time()
-        # train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=6, batch_size=1000)
-        # elapsed_time_torch = time.time() - start
-        # print(f'My model trained in {elapsed_time_torch}')
-
-        # print('Training my model')
-        # start = time.time()
-        # train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=20, batch_size=1000)
-        #
-        # elapsed_time_torch = time.time() - start
-        # print(f'My model trained in {elapsed_time_torch}')
-
-        # auc = show_auc(mlp, X_test, y_test, name=subject)
-        # auc2 = show_auc(mlp_sk, X_test, y_test, name=subject)
-        # sk_auc += [auc2]
-        # torch_auc += [auc]
-        # elapsed_time += [(elapsed_time_sk, elapsed_time_torch)]
-
-        # measure.data_point(auc, collection='auc_{}'.format(subject))
-        # measure.stop(subject)
-        # measure.print()
-        # print('Done experiment id={}, adv={}, dims={}, attempt={}'.format(experiment_id, subject, dims, attempt))
-        # print(f'The result is: {auc} vs {auc2}')
-        # measure.to_pandas().to_pickle(f"results_{attempt % 5}.pickle")
+        measure.print()
+        measure.to_pandas().to_pickle(f"results_{experiment_id % 5}.pickle")
 
     print('-------------------------------- RESULT --------------------------------')
     measure.print()
-    measure.to_pandas().to_pickle("results.pickle")
+    measure.to_pandas().to_pickle("results__4.pickle")
     print(measure.to_pandas())
     plt.figure()
     plt.plot(sk_auc, label='sk')

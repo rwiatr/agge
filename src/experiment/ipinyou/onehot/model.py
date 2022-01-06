@@ -36,17 +36,20 @@ class Mlp(nn.Module):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         self.to(device)
-        sparse_m = X.tocoo()
+        if type(X) is np.ndarray:
+            X = torch.from_numpy(X).float()
+        else:
+            sparse_m = X.tocoo()
 
-        values = sparse_m.data
-        indices = np.vstack((sparse_m.row, sparse_m.col))
+            values = sparse_m.data
+            indices = np.vstack((sparse_m.row, sparse_m.col))
 
-        i = torch.LongTensor(indices)
-        v = torch.FloatTensor(values)
+            i = torch.LongTensor(indices)
+            v = torch.FloatTensor(values)
 
-        shape = sparse_m.shape
+            shape = sparse_m.shape
 
-        X = torch.sparse.FloatTensor(i, v, torch.Size(shape)).to_dense()
+            X = torch.sparse.FloatTensor(i, v, torch.Size(shape)).to_dense()
 
         X = X.to(device)
 
@@ -87,6 +90,8 @@ class dataset(Dataset):
         return t
 
     def sparse_to_tensor(self, sparse_m):
+        if type(sparse_m) is np.ndarray:
+            return torch.from_numpy(sparse_m).float()
         sparse_m = sparse_m.tocoo()
 
         values = sparse_m.data

@@ -242,6 +242,8 @@ class ModelHandler:
 
 
 def sparse_to_tensor(sparse_m):
+    if type(sparse_m) is np.ndarray:
+        return torch.from_numpy(sparse_m).float()
     sparse_m = sparse_m.tocoo()
 
     values = sparse_m.data
