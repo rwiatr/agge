@@ -37,18 +37,21 @@ class Mlp(nn.Module):
     def decision_function(self, X):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self.to(device)
-        sparse_m = X.tocoo()
+        self = self.to(device)
+        if type(X) is np.ndarray:
+            X = torch.from_numpy(X).float()
+        else:
+            sparse_m = X.tocoo()
 
-        values = sparse_m.data
-        indices = np.vstack((sparse_m.row, sparse_m.col))
+            values = sparse_m.data
+            indices = np.vstack((sparse_m.row, sparse_m.col))
 
-        i = torch.LongTensor(indices)
-        v = torch.FloatTensor(values)
+            i = torch.LongTensor(indices)
+            v = torch.FloatTensor(values)
 
-        shape = sparse_m.shape
+            shape = sparse_m.shape
 
-        X = torch.sparse.FloatTensor(i, v, torch.Size(shape)).to_dense()
+            X = torch.sparse.FloatTensor(i, v, torch.Size(shape)).to_dense()
 
         X = X.to(device)
 
@@ -57,10 +60,6 @@ class Mlp(nn.Module):
         return outputs.cpu().numpy()
 
 
-<<<<<<< Updated upstream
-class _Dataset(Dataset):
-    def __init__(self,x,y):
-=======
 class DeepWide(nn.Module):
     def __init__(self, input_size, output_size, hidden_layers_sizes):
         super(DeepWide, self).__init__()
@@ -106,7 +105,7 @@ class DeepWide(nn.Module):
     def decision_function(self, X):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self.to(device)
+        self = self.to(device)
         if type(X) is np.ndarray:
             X = torch.from_numpy(X).float()
         else:
@@ -129,14 +128,10 @@ class DeepWide(nn.Module):
         return outputs.cpu().numpy()
 
 
-
-
-
-
-class dataset(Dataset):
+class HandleDaset(Dataset):
     def __init__(self, x, y):
->>>>>>> Stashed changes
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
         self.x = self.sparse_to_tensor(x).to(device)
         #self.x = torch.tensor(x,dtype=torch.float32)
         self.y = torch.tensor(y,dtype=torch.float32).to(device)
@@ -166,6 +161,8 @@ class dataset(Dataset):
     
     def sparse_to_tensor(self, sparse_m):
 
+        if type(sparse_m) is np.ndarray:
+            return torch.from_numpy(sparse_m).float()
         sparse_m = sparse_m.tocoo()
 
         values = sparse_m.data
@@ -175,24 +172,18 @@ class dataset(Dataset):
         v = torch.FloatTensor(values)
 
         shape = sparse_m.shape
-        
+
         return torch.sparse.FloatTensor(i, v, torch.Size(shape)).to_dense()
 
 def define_model(input_size, output_size, hidden_layer_sizes, bias):
     return Mlp(input_size, output_size, hidden_layer_sizes, bias)
 
 def prep_data(X, y, batch_size, shuffle=False):
-    return DataLoader(_Dataset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
+    return DataLoader(HandleDaset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
 def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience=5, stabilization=0,
-<<<<<<< Updated upstream
-                validation_fraction=0.1, tol=0):
-
-    #define model handler and early top
-=======
                 validation_fraction=0.1, tol=0, epsilon=1e-8, beta_1 = 0.9, beta_2 = 0.999):
     # define model handler and early top
->>>>>>> Stashed changes
     handler = ModelHandler(model, './model')
     stop = EarlyStop(patience=patience, max_epochs=epochs, handler=handler, tol=tol)
 
@@ -219,16 +210,10 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
     # loss and optimizer
     
     loss_fn = nn.BCELoss()
-<<<<<<< Updated upstream
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    #scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience = patience // 3, factor=.5)
-=======
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay, eps=epsilon, betas=(beta_1, beta_2))
     nn.L1Loss
     # scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience // 3, factor=0.5)
->>>>>>> Stashed changes
 
     # training loop
     n_total_steps = len(trainloader)
@@ -379,54 +364,9 @@ class ModelHandler:
 
 
 if __name__ == '__main__':
-<<<<<<< Updated upstream
+    hello = 'hi'
+
+    print(type(hello))
     
-    X = np.random.rand(986207, 561)
-    y = np.random.randint(2, size=986207)
-=======
-    X = np.random.randint(0, 2, size=(10000, 300))
-    y = np.random.randint(2, size=10000)
-
-    Xt = np.random.randint(0, 2 , size=(10000, 300))
-    yt = np.random.randint(2, size=10000)
-
-    X = torch.Tensor(X[:2])
-    Y = torch.Tensor(Xt[:2])
-    
-    dw1 = nn.Linear(300, 32)
-    dw2 = nn.Linear(32, 1)
-
-
-    regr = nn.Linear(300, 1)
-
-    X = torch.sigmoid(regr(X))
-    Y = dw1(Y)
-    Y = dw2(Y)
-    Y = torch.sigmoid(Y)
-
-    print(X.shape, Y.shape)
-
-    catted = torch.cat((X, Y), dim=1)
-    print(catted)
->>>>>>> Stashed changes
-
-    weigted_sum = nn.Linear(2, 1)
-    result = torch.sigmoid(weigted_sum(catted))
-    print('results!!!!: ', result)
-    print('================ERROR=================')
-    dw = DeepWide(input_size=X.shape[1], output_size=1, hidden_layers_sizes=(10, 15))
-
-<<<<<<< Updated upstream
-    mlp = define_model(input_size=X.shape[1], output_size=1, hidden_layer_sizes=(10, 15, 7))
-    train_model(model = mlp, X=X, y=y, lr=1e-5, epochs=3, batch_size=500)    
-    
-    predictions = mlp.decision_function(Xt)
-    print(predictions.shape)
-    print(predictions)
-=======
-    #train_model(model=dw, X=X, y=y, lr=1e-5, epochs=3, batch_size=500)
-
-    #predictions = mlp.decision_function(Xt)
-    #print(predictions.shape)
-    #print(predictions)
->>>>>>> Stashed changes
+    if type(hello) == 'str':
+        print(hello)

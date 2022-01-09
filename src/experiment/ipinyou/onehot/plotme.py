@@ -2,14 +2,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
-<<<<<<< Updated upstream
-    df = pd.read_pickle("results.pickle").explode('value')
-    df.value = df.value.astype(int)
-=======
     df = pd.read_pickle("results_0.pickle").explode('value')
     df.value = df.value.astype(float)
     df.n_iter_no_change = df.n_iter_no_change.astype(int)
->>>>>>> Stashed changes
     print(df.value)
     print(df.columns)
     print(df.dtypes)
@@ -33,9 +28,6 @@ if __name__ == '__main__':
         df[(df.measure_type == "auc_train") & (df.subject == subject)].boxplot(by=["algorithm", "alpha"], column="value")
         plt.xticks(rotation='vertical')
         plt.title("train " + subject)
-<<<<<<< Updated upstream
-    plt.show()
-=======
     plt.show()
 
     for subject in df.subject.unique():
@@ -60,4 +52,3 @@ if __name__ == '__main__':
         plt.xticks(rotation='vertical')
         plt.title("test " + subject + " SKlearn")
     plt.show()
->>>>>>> Stashed changes

@@ -1,23 +1,12 @@
 import os, sys
-<<<<<<< Updated upstream
-import time
-sys.path.append(os.getcwd())
-
-#from experiment.ipinyou.nn import simple
-#from experiment.ipinyou.nn.train import train_model__
-from experiment.ipinyou.onehot.algo import SKLearnMLPRunner, SKLearnLRRunner, MLPRunner
-
-
-=======
 sys.path.append(os.getcwd())
 
 from experiment.ipinyou.agge.agge_handle import AggeHandle
-from experiment.ipinyou.nn import simple
-from experiment.ipinyou.nn.train import train_model__
+#from experiment.ipinyou.nn import simple
+#from experiment.ipinyou.nn.train import train_model__
 from experiment.ipinyou.onehot.algo import SKLearnMLPRunner, SKLearnLRRunner, MLPRunner, DeepWideRunner
 
 
->>>>>>> Stashed changes
 
 # from experiment.ipinyou.onehot.encoder import MyOneHotEncoder
 
@@ -74,15 +63,9 @@ if __name__ == '__main__':
     experiments = generate_space([
         # advertiser ids
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
-<<<<<<< Updated upstream
-        ['3476',],
-        # dims
-        # [50, 300],  # 15, 50, 150, 300
-=======
         [ '2997', '2261'], # '2261', '2821',
         # bins
         [1,],
->>>>>>> Stashed changes
         # alpha
         [0.0001], # 0.0001, 0.01
         # hidden
@@ -108,7 +91,7 @@ if __name__ == '__main__':
     dw = DeepWideRunner().set_measure(measure)
     use_bck = False
 
-    for experiment_id, (subject, alpha, hidden, attempt) in experiments:
+    for experiment_id, (subject, bins, alpha, hidden, attempt) in experiments:
         # if not use_bck:
         if subject != prev_subject:
             df_train, df_test = read_data(subject)
@@ -145,14 +128,6 @@ if __name__ == '__main__':
         X_test = ohe.transform(_df_test[cols])
         y_test = _df_test.click.to_numpy().astype('float64')
 
-<<<<<<< Updated upstream
-        print('ENCODING FINISHED!')
-
-        # measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
-        # measure.start(subject)
-
-        hidden_sizes = (hidden, 7)
-=======
         print('AGGE ENCODING ...')
 
 
@@ -167,7 +142,6 @@ if __name__ == '__main__':
 
 
         hidden_sizes = hidden
->>>>>>> Stashed changes
 
         nn_params = {
             "hidden_layer_sizes": hidden_sizes,
@@ -187,17 +161,6 @@ if __name__ == '__main__':
             # "momentum": 0.9,  # sgd
             # "nesterovs_momentum": True, # sgd
             # "early_stopping": True,  # should be always true
-<<<<<<< Updated upstream
-            # "beta_1": 0.9, "beta_2": 0.999,
-            # "epsilon": 1e-8, "n_iter_no_change": 10, "max_fun": 15000
-            "n_iter_no_change": 10,
-        }
-        print(1. / alpha / 1000000)
-
-
-        '''
-                sk_learn_lr.run({"train": X_train, "test": X_test},
-=======
             "beta_1": 0.9, 
             "beta_2": 0.999,
             "epsilon": 1e-8, 
@@ -219,19 +182,11 @@ if __name__ == '__main__':
         #         **nn_params)
         '''
                 sk_learn_lr.run({"train": X_train_agge, "test": X_test_agge},
->>>>>>> Stashed changes
                         {"train": y_train, "test": y_test},
                         subject,
                         random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
-<<<<<<< Updated upstream
-        
-        '''
-
-        sk_learn_mlp.run({"train": X_train, "test": X_test},
-=======
 
                 sk_learn_mlp.run({"train": X_train_agge, "test": X_test_agge},
->>>>>>> Stashed changes
                          {"train": y_train, "test": y_test},
                          subject,
                          **nn_params)
@@ -240,35 +195,6 @@ if __name__ == '__main__':
                 {"train": y_train, "test": y_test},
                 subject,
                 **nn_params)
-<<<<<<< Updated upstream
-        # mlp = define_model(X_train.shape[1], 1, hidden_sizes)
-
-        # print('Training my model')
-        # start =time.time()
-        # train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=6, batch_size=1000)
-        # elapsed_time_torch = time.time() - start
-        # print(f'My model trained in {elapsed_time_torch}')
-
-        # print('Training my model')
-        # start = time.time()
-        # train_model(model=mlp, X=X_train, y=y_train, lr=0.0001, epochs=20, batch_size=1000)
-        #
-        # elapsed_time_torch = time.time() - start
-        # print(f'My model trained in {elapsed_time_torch}')
-
-        # auc = show_auc(mlp, X_test, y_test, name=subject)
-        # auc2 = show_auc(mlp_sk, X_test, y_test, name=subject)
-        # sk_auc += [auc2]
-        # torch_auc += [auc]
-        # elapsed_time += [(elapsed_time_sk, elapsed_time_torch)]
-
-        # measure.data_point(auc, collection='auc_{}'.format(subject))
-        # measure.stop(subject)
-        # measure.print()
-        # print('Done experiment id={}, adv={}, dims={}, attempt={}'.format(experiment_id, subject, dims, attempt))
-        # print(f'The result is: {auc} vs {auc2}')
-        # measure.to_pandas().to_pickle(f"results_{attempt % 5}.pickle")
-=======
 
 
         '''
@@ -290,34 +216,11 @@ if __name__ == '__main__':
 
         measure.print()
         measure.to_pandas().to_pickle(f"results_{experiment_id % 5}.pickle")
->>>>>>> Stashed changes
 
     print('-------------------------------- RESULT --------------------------------')
     measure.print()
     measure.to_pandas().to_pickle("results.pickle")
     print(measure.to_pandas())
-<<<<<<< Updated upstream
-    print(f'evaluating took: {time.time()-start}')
-    
-    '''
-    plt.figure()
-    plt.plot(sk_auc, label='sk')
-    plt.ylabel('auc')
-    plt.xlabel('model #')
-    plt.plot(torch_auc, label='torch')
-
-    plt.legend()
-    plt.show()
-    plt.savefig('./model_acc.png')
-
-    plt.figure()
-    plt.plot(elapsed_time, label=['sk', 'torch'])
-    plt.ylabel('training time')
-    plt.xlabel('model #')
-    plt.legend()
-    plt.show()
-    plt.savefig('./model_time.png')
-=======
     print(f'evaluation took: {time.time() - start}')
 
     '''
@@ -361,6 +264,5 @@ if __name__ == '__main__':
 
 
         w poszukiwaniu optymalnych parametrów deterministycznego modelu wzrostu wartości przedsiębiorstwa
->>>>>>> Stashed changes
     '''
     
