@@ -1,4 +1,5 @@
 import os, sys
+<<<<<<< Updated upstream
 import time
 sys.path.append(os.getcwd())
 
@@ -7,6 +8,16 @@ sys.path.append(os.getcwd())
 from experiment.ipinyou.onehot.algo import SKLearnMLPRunner, SKLearnLRRunner, MLPRunner
 
 
+=======
+sys.path.append(os.getcwd())
+
+from experiment.ipinyou.agge.agge_handle import AggeHandle
+from experiment.ipinyou.nn import simple
+from experiment.ipinyou.nn.train import train_model__
+from experiment.ipinyou.onehot.algo import SKLearnMLPRunner, SKLearnLRRunner, MLPRunner, DeepWideRunner
+
+
+>>>>>>> Stashed changes
 
 # from experiment.ipinyou.onehot.encoder import MyOneHotEncoder
 
@@ -63,13 +74,19 @@ if __name__ == '__main__':
     experiments = generate_space([
         # advertiser ids
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
+<<<<<<< Updated upstream
         ['3476',],
         # dims
         # [50, 300],  # 15, 50, 150, 300
+=======
+        [ '2997', '2261'], # '2261', '2821',
+        # bins
+        [1,],
+>>>>>>> Stashed changes
         # alpha
-        [0.000001, 0.0001, 0.01],
+        [0.0001], # 0.0001, 0.01
         # hidden
-        [4, 32],
+        [(32, 8)],
         # re-runs
         list(range(3)),
     ],
@@ -88,6 +105,7 @@ if __name__ == '__main__':
     sk_learn_mlp = SKLearnMLPRunner().set_measure(measure)
     sk_learn_lr = SKLearnLRRunner().set_measure(measure)
     mlp = MLPRunner().set_measure(measure)
+    dw = DeepWideRunner().set_measure(measure)
     use_bck = False
 
     for experiment_id, (subject, alpha, hidden, attempt) in experiments:
@@ -127,31 +145,49 @@ if __name__ == '__main__':
         X_test = ohe.transform(_df_test[cols])
         y_test = _df_test.click.to_numpy().astype('float64')
 
+<<<<<<< Updated upstream
         print('ENCODING FINISHED!')
 
         # measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
         # measure.start(subject)
 
         hidden_sizes = (hidden, 7)
+=======
+        print('AGGE ENCODING ...')
+
+
+        print('AGGE ENCODING ...')
+
+        agge_handler = AggeHandle(bins=bins)
+        X_train_agge, X_test_agge = \
+            agge_handler.fit_and_convert(_df_train[cols + ['click']], _df_test[cols + ['click']])
+        print('ENCODING FINISHED!')
+        print("feature size of agge", X_train_agge.shape[1])
+        
+
+
+        hidden_sizes = hidden
+>>>>>>> Stashed changes
 
         nn_params = {
             "hidden_layer_sizes": hidden_sizes,
             # "activation":"relu",
             # "solver":'adam',
-            "alpha": alpha,  # 0.000001,
+            "alpha": alpha,  # 0.000001, #weight decay
             "batch_size": 1000,
             # "learning_rate": "constant",
             "learning_rate_init": 0.001,
-            # "power_t": 0.5,
+            # "power_t": 0.5, # ’sgd’
             "max_iter": 100,  # implement
             # "shuffle": True, # always true
             "validation_fraction": 0.1,  # implement
             # "random_state":None,
             "tol": 1e-4,  # implement OR make sure its low
             # "warm_start": False,
-            # "momentum": 0.9,
-            # "nesterovs_momentum": True,
+            # "momentum": 0.9,  # sgd
+            # "nesterovs_momentum": True, # sgd
             # "early_stopping": True,  # should be always true
+<<<<<<< Updated upstream
             # "beta_1": 0.9, "beta_2": 0.999,
             # "epsilon": 1e-8, "n_iter_no_change": 10, "max_fun": 15000
             "n_iter_no_change": 10,
@@ -161,13 +197,41 @@ if __name__ == '__main__':
 
         '''
                 sk_learn_lr.run({"train": X_train, "test": X_test},
+=======
+            "beta_1": 0.9, 
+            "beta_2": 0.999,
+            "epsilon": 1e-8, 
+            # "max_fun": 15000, # sgd
+            "n_iter_no_change": 10
+        }
+        print(1. / alpha / 1000000)
+        # sk_learn_lr.run({"train": X_train, "test": X_test},
+        #                 {"train": y_train, "test": y_test},
+        #                 subject + f";encoding=oh;features={X_train.shape[1]}",
+        #                 random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
+        # sk_learn_mlp.run({"train": X_train, "test": X_test},
+        #                  {"train": y_train, "test": y_test},
+        #                  subject + f";encoding=oh;features={X_train.shape[1]}",
+        #                  **nn_params)
+        # mlp.run({"train": X_train, "test": X_test},
+        #         {"train": y_train, "test": y_test},
+        #         subject + f";encoding=oh;features={X_train.shape[1]}",
+        #         **nn_params)
+        '''
+                sk_learn_lr.run({"train": X_train_agge, "test": X_test_agge},
+>>>>>>> Stashed changes
                         {"train": y_train, "test": y_test},
                         subject,
                         random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
+<<<<<<< Updated upstream
         
         '''
 
         sk_learn_mlp.run({"train": X_train, "test": X_test},
+=======
+
+                sk_learn_mlp.run({"train": X_train_agge, "test": X_test_agge},
+>>>>>>> Stashed changes
                          {"train": y_train, "test": y_test},
                          subject,
                          **nn_params)
@@ -176,6 +240,7 @@ if __name__ == '__main__':
                 {"train": y_train, "test": y_test},
                 subject,
                 **nn_params)
+<<<<<<< Updated upstream
         # mlp = define_model(X_train.shape[1], 1, hidden_sizes)
 
         # print('Training my model')
@@ -203,11 +268,35 @@ if __name__ == '__main__':
         # print('Done experiment id={}, adv={}, dims={}, attempt={}'.format(experiment_id, subject, dims, attempt))
         # print(f'The result is: {auc} vs {auc2}')
         # measure.to_pandas().to_pickle(f"results_{attempt % 5}.pickle")
+=======
+
+
+        '''
+
+        dw.run({"train": X_train_agge, "test": X_test_agge},
+                {"train": y_train, "test": y_test},
+                subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+                **nn_params)
+
+        mlp.run({"train": X_train_agge, "test": X_test_agge},
+                {"train": y_train, "test": y_test},
+                subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+                **nn_params)
+
+        sk_learn_mlp.run({"train": X_train_agge, "test": X_test_agge},
+                {"train": y_train, "test": y_test},
+                subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+                **nn_params)
+
+        measure.print()
+        measure.to_pandas().to_pickle(f"results_{experiment_id % 5}.pickle")
+>>>>>>> Stashed changes
 
     print('-------------------------------- RESULT --------------------------------')
     measure.print()
     measure.to_pandas().to_pickle("results.pickle")
     print(measure.to_pandas())
+<<<<<<< Updated upstream
     print(f'evaluating took: {time.time()-start}')
     
     '''
@@ -228,5 +317,50 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
     plt.savefig('./model_time.png')
+=======
+    print(f'evaluation took: {time.time() - start}')
+
+    '''
+    
+        X_train = _df_train[['weekday', 'hour',  # 'timestamp',
+                 'useragent', 'region', 'city', 'adexchange',
+                 'slotwidth', 'slotheight',
+                 'slotvisibility', 'slotformat', 'slotprice_bucket',  # 'slotprice',
+                 'creative',  # 'bidprice', #'payprice',
+                 'keypage', 'advertiser']].to
+        
+        y_train = _df_train.click.astype('float64')
+
+
+        X_test = _df_test[['weekday', 'hour',  # 'timestamp',
+                 'useragent', 'region', 'city', 'adexchange',
+                 'slotwidth', 'slotheight',
+                 'slotvisibility', 'slotformat', 'slotprice_bucket',  # 'slotprice',
+                 'creative',  # 'bidprice', #'payprice',
+                 'keypage', 'advertiser']].astype('float64')
+
+        y_test = _df_test.click.astype('float64')
+
+        
+        
+        
+        hfe = train_encoder(_df_train, size=dims)
+        X_train = hfe.transform(_df_train).astype('float64')
+        y_train = _df_train.click.to_numpy().astype('float64')
+        X_test = hfe.transform(_df_test).astype('float64')
+        y_test = _df_test.click.to_numpy().astype('float64')
+
+        measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
+        measure.start(subject)
+        lr = LogisticRegression(random_state=0, max_iter=10000, verbose=0, solver='lbfgs').fit(X_train, y_train)
+        auc = show_auc(lr, X_test, y_test, name=subject)
+        measure.data_point(auc, collection='auc_{}'.format(subject))
+        measure.stop(subject)
+        measure.print()
+        print('Done experiment id={}, adv={}, dims={}, attempt={}'.format(experiment_id, subject, dims, attempt))
+
+
+        w poszukiwaniu optymalnych parametrów deterministycznego modelu wzrostu wartości przedsiębiorstwa
+>>>>>>> Stashed changes
     '''
     

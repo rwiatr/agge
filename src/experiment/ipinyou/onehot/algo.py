@@ -3,7 +3,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import LogisticRegression
 
 from experiment.display_bis import show_auc
-from experiment.ipinyou.onehot.model import define_model, train_model
+from experiment.ipinyou.onehot.model import DeepWide, define_model, train_model
 from experiment.measure import ProcessMeasure
 import torch.nn as nn
 
@@ -68,7 +68,8 @@ class MLPRunner(AlgoRunner):
                               weight_decay=properties['alpha'],
                               patience=properties['n_iter_no_change'],
                               validation_fraction=properties['validation_fraction'],
-                              tol=properties['tol'])
+                              tol=properties['tol'],
+                              epsilon=properties['epsilon'])
         handler.best()
         auc = self.to_auc(mlp, subject, X, y)
         handler.last()
@@ -76,6 +77,30 @@ class MLPRunner(AlgoRunner):
                 "best_model_test": auc['test'],
                 "best_model_train": auc['train']}
 
+
+class DeepWideRunner(AlgoRunner):
+    def __init__(self):
+        super(DeepWideRunner, self).__init__("DeepWide")
+    
+    def algo(self, subject, X, y, **properties):
+        dw = DeepWide(X['train'].shape[1], 1, hidden_layers_sizes=properties['hidden_layer_sizes'])
+        dw.apply(init_weights)
+        handler = train_model(model=dw, X=X['train'], y=y['train'],
+                              lr=properties['learning_rate_init'],
+                              epochs=properties['max_iter'],
+                              batch_size=properties['batch_size'],
+                              weight_decay=properties['alpha'],
+                              patience=properties['n_iter_no_change'],
+                              validation_fraction=properties['validation_fraction'],
+                              tol=properties['tol'],
+                              epsilon=properties['epsilon'])
+        
+        handler.best()
+        auc = self.to_auc(dw, subject, X, y)
+        handler.last()
+        return {**self.to_auc(dw, subject, X, y),
+                "best_model_test": auc['test'],
+                "best_model_train": auc['train']}
 
 def init_weights(m):
     if isinstance(m, nn.Linear):
