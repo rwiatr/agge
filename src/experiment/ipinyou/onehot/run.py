@@ -1,4 +1,5 @@
 import os, sys
+import time
 sys.path.append(os.getcwd())
 
 #from experiment.ipinyou.nn import simple
@@ -70,7 +71,7 @@ if __name__ == '__main__':
         # hidden
         [4, 32],
         # re-runs
-        list(range(15)),
+        list(range(3)),
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
         start=0)
@@ -79,6 +80,7 @@ if __name__ == '__main__':
     sk_auc = []
     torch_auc = []
     elapsed_time = []
+    start = time.time()
 
     prev_subject = None
     df_train, df_test = (None, None)
@@ -155,14 +157,21 @@ if __name__ == '__main__':
             "n_iter_no_change": 10,
         }
         print(1. / alpha / 1000000)
-        sk_learn_lr.run({"train": X_train, "test": X_test},
+
+
+        '''
+                sk_learn_lr.run({"train": X_train, "test": X_test},
                         {"train": y_train, "test": y_test},
                         subject,
                         random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
+        
+        '''
+
         sk_learn_mlp.run({"train": X_train, "test": X_test},
                          {"train": y_train, "test": y_test},
                          subject,
                          **nn_params)
+                         
         mlp.run({"train": X_train, "test": X_test},
                 {"train": y_train, "test": y_test},
                 subject,
@@ -199,6 +208,7 @@ if __name__ == '__main__':
     measure.print()
     measure.to_pandas().to_pickle("results.pickle")
     print(measure.to_pandas())
+    print(f'evaluating took: {time.time()-start}')
     
     '''
     plt.figure()

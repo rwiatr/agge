@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
-    df = pd.read_pickle("results_0.pickle").explode('value')
+    df = pd.read_pickle("results.pickle").explode('value')
     df.value = df.value.astype(int)
     print(df.value)
     print(df.columns)
