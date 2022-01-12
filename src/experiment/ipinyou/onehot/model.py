@@ -114,9 +114,9 @@ def prep_data(X, y, batch_size, shuffle=False):
 
 
 def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience=5, stabilization=0,
-                validation_fraction=0.1, tol=0):
+                validation_fraction=0.1, tol=0, experiment_id=None):
     # define model handler and early top
-    handler = ModelHandler(model, './model')
+    handler = ModelHandler(model, './model' if experiment_id is None else f'./model_{experiment_id}')
     stop = EarlyStop(patience=patience, max_epochs=epochs, handler=handler, tol=tol)
 
     perut = torch.randperm(X.shape[0])

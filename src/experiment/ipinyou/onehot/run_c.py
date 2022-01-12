@@ -67,11 +67,11 @@ if __name__ == '__main__':
         # sample_ids
         list(range(15)),
         # bins
-        [1, 5, 10, 50, 150, 300],
+        [1],
         # alpha
-        [0.1, 1.0],
+        [0.000001, 0.0001, 0.01, 0.1, 1.0],
         # hidden
-        [4, 32],
+        [128],
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
         start=0)
@@ -83,15 +83,14 @@ if __name__ == '__main__':
 
     prev_subject = None
     df_train, df_test = (None, None)
+    output = "result__8"
 
     sk_learn_mlp = SKLearnMLPRunner().set_measure(measure)
     sk_learn_lr = SKLearnLRRunner().set_measure(measure)
-    mlp = MLPRunner("run").set_measure(measure)
+    mlp = MLPRunner(output).set_measure(measure)
     use_bck = False
 
     d_mgr = DataManager()
-
-    prev_bins = None
 
     for experiment_id, (subject, sample_id, bins, alpha, hidden) in experiments:
         print(f"EXPERIMENT {experiment_id}/{len(experiments)}")
@@ -122,41 +121,40 @@ if __name__ == '__main__':
             # "epsilon": 1e-8, "n_iter_no_change": 10, "max_fun": 15000
             "n_iter_no_change": 10
         }
-
-        # print(1. / alpha / 1000000)
-        # sk_learn_lr.run({"train": X_train, "test": X_test},
-        #                 {"train": y_train, "test": y_test},
-        #                 subject + f";encoding=oh;features={X_train.shape[1]}",
-        #                 random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
-        # sk_learn_mlp.run({"train": X_train, "test": X_test},
-        #                  {"train": y_train, "test": y_test},
-        #                  subject + f";encoding=oh;features={X_train.shape[1]}",
-        #                  **nn_params)
-        # mlp.run({"train": X_train, "test": X_test},
-        #         {"train": y_train, "test": y_test},
-        #         subject + f";encoding=oh;features={X_train.shape[1]}",
-        #         **nn_params)
-
-        sk_learn_lr.run({"train": X_train_agge, "test": X_test_agge},
+        print(1. / alpha / 1000000)
+        sk_learn_lr.run({"train": X_train, "test": X_test},
                         {"train": y_train, "test": y_test},
-                        subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+                        subject + f";encoding=oh;features={X_train.shape[1]}",
                         random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
-        sk_learn_mlp.run({"train": X_train_agge, "test": X_test_agge},
+        sk_learn_mlp.run({"train": X_train, "test": X_test},
                          {"train": y_train, "test": y_test},
-                         subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+                         subject + f";encoding=oh;features={X_train.shape[1]}",
                          **nn_params)
-        mlp.run({"train": X_train_agge, "test": X_test_agge},
+        mlp.run({"train": X_train, "test": X_test},
                 {"train": y_train, "test": y_test},
-                subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+                subject + f";encoding=oh;features={X_train.shape[1]}",
                 **nn_params)
+
+        # sk_learn_lr.run({"train": X_train_agge, "test": X_test_agge},
+        #                 {"train": y_train, "test": y_test},
+        #                 subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+        #                 random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
+        # sk_learn_mlp.run({"train": X_train_agge, "test": X_test_agge},
+        #                  {"train": y_train, "test": y_test},
+        #                  subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+        #                  **nn_params)
+        # mlp.run({"train": X_train_agge, "test": X_test_agge},
+        #         {"train": y_train, "test": y_test},
+        #         subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+        #         **nn_params)
         if experiment_id % 100 == 0:
             measure.print()
 
-        print(f"writing results_{experiment_id % 5}.pickle")
-        measure.to_pandas().to_pickle(f"results_{experiment_id % 5}.pickle")
+        print(f"writing {output}_{experiment_id % 5}.pickle")
+        measure.to_pandas().to_pickle(f"{output}_{experiment_id % 5}.pickle")
 
     print('-------------------------------- RESULT --------------------------------')
-    measure.to_pandas().to_pickle("results__5.pickle")
+    measure.to_pandas().to_pickle(f"{output}.pickle")
     print(measure.to_pandas())
     plt.figure()
     plt.plot(sk_auc, label='sk')

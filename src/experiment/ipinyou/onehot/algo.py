@@ -26,7 +26,7 @@ class AlgoRunner:
             self.measure.data_point(aucs[key], collection=f"auc_{key}_::algorithm={self.name};subject={subject}")
 
         self.measure.stop(f"::algorithm={self.name};subject={subject}")
-        self.measure.print()
+        # self.measure.print()
 
     def algo(self, subject, X, y, **properties):
         return {"NA": 0}
@@ -55,8 +55,9 @@ class SKLearnLRRunner(AlgoRunner):
 
 
 class MLPRunner(AlgoRunner):
-    def __init__(self):
+    def __init__(self, experiment_id=None):
         super(MLPRunner, self).__init__("MLP-v0")
+        self.experiment_id = experiment_id
 
     def algo(self, subject, X, y, **properties):
         mlp = define_model(X['train'].shape[1], 1, hidden_layer_sizes=properties['hidden_layer_sizes'])
@@ -68,7 +69,8 @@ class MLPRunner(AlgoRunner):
                               weight_decay=properties['alpha'],
                               patience=properties['n_iter_no_change'],
                               validation_fraction=properties['validation_fraction'],
-                              tol=properties['tol'])
+                              tol=properties['tol'],
+                              experiment_id=self.experiment_id)
         handler.best()
         auc = self.to_auc(mlp, subject, X, y)
         handler.last()

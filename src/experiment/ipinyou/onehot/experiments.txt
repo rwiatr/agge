@@ -1,0 +1,80 @@
+nn_params = {
+    "hidden_layer_sizes": hidden_sizes,
+    "alpha": alpha,  # 0.000001,
+    "batch_size": 1000,
+    "learning_rate_init": 0.001,
+    "max_iter": 100,  # implement
+    "validation_fraction": 0.1,  # implement - check without validation on our implementation
+    "tol": 1e-4,  # implement OR make sure its low
+    "n_iter_no_change": 10
+}
+
+RESULTS:
+    result__2.pickle
+    type: oh, agge
+    models: sklearn-lr, sklearn-mlp, mlp
+    advertisers: '2259', '3476'
+    bins: 10
+    alpha: [0.000001, 0.0001, 0.01]
+    hidden: [4, 32] x 8
+    re-runs: 15
+
+
+    result__3.pickle
+    type: oh, agge
+    models: sklearn-lr, sklearn-mlp, mlp
+    advertisers: '2261', '2821', '2997'
+    bins: 10
+    alpha: [0.000001, 0.0001, 0.01]
+    hidden: [4, 32] x 8
+    re-runs: 15
+
+
+    result__4.pickle
+    type: oh, agge
+    models: sklearn-lr, sklearn-mlp, mlp
+    advertisers: '2261', '2821', '2997'
+    bins: [1, 5, 10, 50, 150, 300]
+    alpha: [0.000001, 0.0001, 0.01]
+    hidden: [4, 32] x 8
+    re-runs: 15
+
+
+    * result__5.pickle
+    type: agge
+    models: sklearn-lr, sklearn-mlp, mlp
+    advertisers: '2261', '2821', '2997'
+    bins: [1, 5, 10, 50, 150, 300]
+    alpha: [0.1, 1.0]
+    hidden: [4, 32] x 8
+    re-runs: 15
+
+
+    * result__6.pickle
+    type: oh
+    models: sklearn-lr, sklearn-mlp, mlp
+    advertisers: '2261', '2821', '2997'
+    bins: [1]
+    alpha: [0.1, 1.0]
+    hidden: [4, 32] x 8
+    re-runs: 15
+
+
+    * result__7.pickle
+    type: agge
+    models: sklearn-lr, sklearn-mlp, mlp
+    advertisers: '2261', '2821', '2997'
+    bins: [1, 5, 10, 50, 150, 300]
+    alpha: [0.000001, 0.0001, 0.01, 0.1, 1.0]
+    hidden: [128] x 8
+    re-runs: 15
+
+
+    * result__8.pickle
+    type: oh
+    models: sklearn-lr, sklearn-mlp, mlp
+    advertisers: '2261', '2821', '2997'
+    bins: [1]
+    alpha: [0.000001, 0.0001, 0.01, 0.1, 1.0]
+    hidden: [128] x 8
+    re-runs: 15
