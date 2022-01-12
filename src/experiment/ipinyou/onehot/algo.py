@@ -60,7 +60,7 @@ class MLPRunner(AlgoRunner):
 
     def algo(self, subject, X, y, **properties):
         mlp = define_model(X['train'].shape[1], 1, hidden_layer_sizes=properties['hidden_layer_sizes'], bias=True)
-        mlp.apply(init_weights)
+        #mlp.apply(init_weights)
         handler = train_model(model=mlp, X=X['train'], y=y['train'],
                               lr=properties['learning_rate_init'],
                               epochs=properties['max_iter'],
@@ -69,7 +69,9 @@ class MLPRunner(AlgoRunner):
                               patience=properties['n_iter_no_change'],
                               validation_fraction=properties['validation_fraction'],
                               tol=properties['tol'],
-                              epsilon=properties['epsilon'])
+                              epsilon=properties['epsilon'],
+                              early_stop=properties['early_stopping'],
+                              verbose = False)
         handler.best()
         auc = self.to_auc(mlp, subject, X, y)
         handler.last()
@@ -84,7 +86,9 @@ class DeepWideRunner(AlgoRunner):
     
     def algo(self, subject, X, y, **properties):
         dw = DeepWide(X['train'].shape[1], 1, hidden_layers_sizes=properties['hidden_layer_sizes'])
-        dw.apply(init_weights)
+        #dw.apply(init_weights)
+        
+        # dw.apply(init_weights)
         handler = train_model(model=dw, X=X['train'], y=y['train'],
                               lr=properties['learning_rate_init'],
                               epochs=properties['max_iter'],
@@ -93,7 +97,9 @@ class DeepWideRunner(AlgoRunner):
                               patience=properties['n_iter_no_change'],
                               validation_fraction=properties['validation_fraction'],
                               tol=properties['tol'],
-                              epsilon=properties['epsilon'])
+                              epsilon=properties['epsilon'], 
+                              early_stop=properties['early_stopping'],
+                              verbose = False)
         
         handler.best()
         auc = self.to_auc(dw, subject, X, y)

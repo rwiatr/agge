@@ -37,7 +37,7 @@ class Mlp(nn.Module):
     def decision_function(self, X):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self = self.to(device)
+        self.to(device)
         if type(X) is np.ndarray:
             X = torch.from_numpy(X).float()
         else:
@@ -65,7 +65,9 @@ class DeepWide(nn.Module):
         super(DeepWide, self).__init__()
 
         #deep
-        self.input_layer = nn.Linear(input_size, hidden_layers_sizes[0])
+        self.embedding = nn.Linear(input_size, int(input_size//2), bias=False)
+        self.input_layer = nn.Linear(int(input_size//2), hidden_layers_sizes[0])
+
         self.relu = nn.ReLU()
 
         # hidden layers
@@ -74,38 +76,28 @@ class DeepWide(nn.Module):
             self.linears_relus.append(nn.Linear(hidden_layers_sizes[i], hidden_layers_sizes[i + 1]))
             self.linears_relus.append(nn.ReLU())
 
-        # output layer
-        self.output_layer = nn.Linear(hidden_layers_sizes[-1], output_size)
-        
-        #wide
-        self.regr = nn.Linear(input_size, output_size)
-
-        #weigted sum
-        self.weighted_sum = nn.Linear(2, 1)
+        # connect deep n wide
+        self.output_layer = nn.Linear(hidden_layers_sizes[-1] + input_size, output_size)
     
     def forward(self, data_input):
         
         #deep forward
-        x = self.input_layer(data_input)
+        x = self.embedding(data_input)
+        x = self.input_layer(x)
         x = self.relu(x)
         for seq in self.linears_relus:
             x = seq(x)
 
-        x = torch.sigmoid(self.output_layer(x))
-
-        #regr forward
-        x2 = torch.sigmoid(self.regr(data_input))
-
-        #together
-        x = torch.cat((x, x2), dim=1)
-        out = self.weighted_sum(x)
-        out = torch.sigmoid(out)
+        #deep n wide
+        dw_input = torch.cat((x, data_input), dim=1)
+        
+        out = torch.sigmoid(self.output_layer(dw_input))
         return out
 
     def decision_function(self, X):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self = self.to(device)
+        self.to(device)
         if type(X) is np.ndarray:
             X = torch.from_numpy(X).float()
         else:
@@ -182,9 +174,11 @@ def prep_data(X, y, batch_size, shuffle=False):
     return DataLoader(HandleDaset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
 def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience=5, stabilization=0,
-                validation_fraction=0.1, tol=0, epsilon=1e-8, beta_1 = 0.9, beta_2 = 0.999):
+                validation_fraction=0.1, tol=0, epsilon=1e-8, beta_1 = 0.9, beta_2 = 0.999, early_stop=True, verbose=False):
     # define model handler and early top
     handler = ModelHandler(model, './model')
+    if not early_stop:
+        patience = epochs
     stop = EarlyStop(patience=patience, max_epochs=epochs, handler=handler, tol=tol)
 
     # train vali split
@@ -205,8 +199,8 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'The device used for training is: {device}')
     
-    model = model.to(device)
- 
+    model.to(device)
+    print(f'Cuda?: ', next(model.parameters()).is_cuda)
     # loss and optimizer
     
     loss_fn = nn.BCELoss()
@@ -251,6 +245,7 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
         if stabilization > 0:
             stabilization -= 1
         else:
+            val_steps = 1 if val_steps == 0 else val_steps
             stop.update_epoch_loss(validation_loss=np.abs(val_loss / val_steps),
                                    train_loss=np.abs(train_loss / train_steps))
 
@@ -259,12 +254,13 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
                 handler.save(mtype='best')
 
         curr_lr = optimizer.param_groups[0]['lr']
-        print(f'Epoch {epoch},    \
-            Training Loss: {train_loss / train_steps:.8f}\t \
-            Training Steps: {train_steps}\t \
-            Validation Loss:{val_loss / val_steps:.8f}\t \
-            Validation Steps:{val_steps}\t \
-            LR:{curr_lr}')
+        if verbose:
+            print(f'Epoch {epoch},    \
+                Training Loss: {train_loss / train_steps:.8f}\t \
+                Training Steps: {train_steps}\t \
+                Validation Loss:{val_loss / val_steps:.8f}\t \
+                Validation Steps:{val_steps}\t \
+                LR:{curr_lr}')
         scheduler.step(val_loss)
         epoch += 1
 

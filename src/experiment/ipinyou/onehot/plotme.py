@@ -12,7 +12,7 @@ if __name__ == '__main__':
     print(df.algorithm.unique())
 
     df = df[((df.algorithm == "MLP-v0") & (df.alpha == "0.0001")) |
-       ((df.algorithm == "SKLearn-MLP") & (df.alpha == "0.0001")) | ((df.algorithm == 'DeepWide'))]
+       ((df.algorithm == "SKLearn-MLP") & (df.alpha == "0.0001")) | ((df.algorithm == 'DeepWide') & (df.alpha == "0.0001"))]
     print(df)
     for subject in df.subject.unique():
         df[(df.measure_type == "auc_test") & (df.subject == subject)].boxplot(by="algorithm", column="value")
@@ -31,14 +31,13 @@ if __name__ == '__main__':
     plt.show()
 
     for subject in df.subject.unique():
-        df[(df.measure_type == "auc_test") & (df.subject == subject)].boxplot(by=["algorithm", "learning_rate_init"], column="n_iter_no_change")
+        df[(df.measure_type == "auc_test") & (df.subject == subject)].boxplot(by=["algorithm", "learning_rate_init"], column="value")
         plt.xticks(rotation='vertical')
         plt.title("test " + subject)
-        df[(df.measure_type == "auc_train") & (df.subject == subject)].boxplot(by=["algorithm", "learning_rate_init"], column="n_iter_no_change")
+        df[(df.measure_type == "auc_train") & (df.subject == subject)].boxplot(by=["algorithm", "learning_rate_init"], column="value")
         plt.xticks(rotation='vertical')
         plt.title("train " + subject)
     plt.show()
-
 
     for subject in df.subject.unique():
 

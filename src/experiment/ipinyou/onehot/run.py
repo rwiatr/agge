@@ -65,12 +65,14 @@ if __name__ == '__main__':
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
         [ '2997', '2261'], # '2261', '2821',
         # bins
-        [1,],
+        [1],
         # alpha
-        [0.0001], # 0.0001, 0.01
+        [0.0001,], # 0.0001, 0.01
+        #lr
+        [0.001, 0.0001],
         # hidden
-        [(32, 8)],
-        # re-runs
+        [(32, 8), (64, 32, 8), (128, 64, 32, 8)],
+        # re-run
         list(range(3)),
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
@@ -91,7 +93,7 @@ if __name__ == '__main__':
     dw = DeepWideRunner().set_measure(measure)
     use_bck = False
 
-    for experiment_id, (subject, bins, alpha, hidden, attempt) in experiments:
+    for experiment_id, (subject, bins, alpha, lr, hidden, attempt) in experiments:
         # if not use_bck:
         if subject != prev_subject:
             df_train, df_test = read_data(subject)
@@ -150,9 +152,9 @@ if __name__ == '__main__':
             "alpha": alpha,  # 0.000001, #weight decay
             "batch_size": 1000,
             # "learning_rate": "constant",
-            "learning_rate_init": 0.001,
+            "learning_rate_init": lr,
             # "power_t": 0.5, # ’sgd’
-            "max_iter": 100,  # implement
+            "max_iter": 50,  # implement
             # "shuffle": True, # always true
             "validation_fraction": 0.1,  # implement
             # "random_state":None,
@@ -160,7 +162,7 @@ if __name__ == '__main__':
             # "warm_start": False,
             # "momentum": 0.9,  # sgd
             # "nesterovs_momentum": True, # sgd
-            # "early_stopping": True,  # should be always true
+            "early_stopping": False,  # should be always true
             "beta_1": 0.9, 
             "beta_2": 0.999,
             "epsilon": 1e-8, 
@@ -199,17 +201,17 @@ if __name__ == '__main__':
 
         '''
 
-        dw.run({"train": X_train_agge, "test": X_test_agge},
+        dw.run({"train": X_train, "test": X_test},
                 {"train": y_train, "test": y_test},
                 subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
                 **nn_params)
 
-        mlp.run({"train": X_train_agge, "test": X_test_agge},
+        mlp.run({"train": X_train, "test": X_test},
                 {"train": y_train, "test": y_test},
                 subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
                 **nn_params)
 
-        sk_learn_mlp.run({"train": X_train_agge, "test": X_test_agge},
+        sk_learn_mlp.run({"train": X_train, "test": X_test},
                 {"train": y_train, "test": y_test},
                 subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
                 **nn_params)
