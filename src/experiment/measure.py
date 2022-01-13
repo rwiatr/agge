@@ -56,6 +56,6 @@ class ProcessMeasure:
                 yield {"measure_type": type_, "value": dictionary[key],
                        **{p.split("=")[0]: p.split("=")[1] for p in to_parse.split(';')}}
 
-
+        import pandas as pd
 
         return pd.DataFrame.from_records([d for d in as_dict(self.points)])

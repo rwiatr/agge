@@ -26,14 +26,14 @@ class AlgoRunner:
             self.measure.data_point(aucs[key], collection=f"auc_{key}_::algorithm={self.name};subject={subject}")
 
         self.measure.stop(f"::algorithm={self.name};subject={subject}")
-        self.measure.print()
+        # self.measure.print()
 
     def algo(self, subject, X, y, **properties):
         return {"NA": 0}
 
     def to_auc(self, model, subject, X, y):
-        return {"train": show_auc(model, X['train'], y['train'], name="Train " + subject + " " + self.name),
-                "test": show_auc(model, X['test'], y['test'], name="Test " + subject + " " + self.name)}
+        return {"train": show_auc(model, X['train'], y['train'], name="Train " + subject + " " + self.name, plot=False),
+                "test": show_auc(model, X['test'], y['test'], name="Test " + subject + " " + self.name, plot=False)}
 
 
 class SKLearnMLPRunner(AlgoRunner):
@@ -55,12 +55,13 @@ class SKLearnLRRunner(AlgoRunner):
 
 
 class MLPRunner(AlgoRunner):
-    def __init__(self):
+    def __init__(self, experiment_id=None):
         super(MLPRunner, self).__init__("MLP-v0")
+        self.experiment_id = experiment_id
 
     def algo(self, subject, X, y, **properties):
-        mlp = define_model(X['train'].shape[1], 1, hidden_layer_sizes=properties['hidden_layer_sizes'], bias=True)
-        #mlp.apply(init_weights)
+        mlp = define_model(X['train'].shape[1], 1, hidden_layer_sizes=properties['hidden_layer_sizes'])
+        mlp.apply(init_weights)
         handler = train_model(model=mlp, X=X['train'], y=y['train'],
                               lr=properties['learning_rate_init'],
                               epochs=properties['max_iter'],
@@ -71,7 +72,8 @@ class MLPRunner(AlgoRunner):
                               tol=properties['tol'],
                               epsilon=properties['epsilon'],
                               early_stop=properties['early_stopping'],
-                              verbose = False)
+                              verbose = False,
+                              experiment_id=self.experiment_id)
         handler.best()
         auc = self.to_auc(mlp, subject, X, y)
         handler.last()
@@ -83,12 +85,11 @@ class MLPRunner(AlgoRunner):
 class DeepWideRunner(AlgoRunner):
     def __init__(self):
         super(DeepWideRunner, self).__init__("DeepWide")
-    
+
     def algo(self, subject, X, y, **properties):
         dw = DeepWide(X['train'].shape[1], 1, hidden_layers_sizes=properties['hidden_layer_sizes'])
-        #dw.apply(init_weights)
-        
-        # dw.apply(init_weights)
+        dw.apply(init_weights)
+
         handler = train_model(model=dw, X=X['train'], y=y['train'],
                               lr=properties['learning_rate_init'],
                               epochs=properties['max_iter'],
@@ -97,10 +98,10 @@ class DeepWideRunner(AlgoRunner):
                               patience=properties['n_iter_no_change'],
                               validation_fraction=properties['validation_fraction'],
                               tol=properties['tol'],
-                              epsilon=properties['epsilon'], 
+                              epsilon=properties['epsilon'],
                               early_stop=properties['early_stopping'],
                               verbose = False)
-        
+
         handler.best()
         auc = self.to_auc(dw, subject, X, y)
         handler.last()
@@ -112,3 +113,5 @@ def init_weights(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.xavier_uniform_(m.weight)
         m.bias.data.fill_(0.01)
+
+

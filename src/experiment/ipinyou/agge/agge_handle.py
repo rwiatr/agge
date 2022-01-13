@@ -1,5 +1,6 @@
 from experiment.ipinyou.agge.train import train_estimators
 
+
 class AggeHandle:
 
     def __init__(self, bins):

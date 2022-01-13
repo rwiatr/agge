@@ -8,10 +8,7 @@ from experiment.ipinyou.onehot.data_manager import DataManager
 
 sys.path.append(os.getcwd())
 
-from experiment.ipinyou.agge.agge_handle import AggeHandle
-# from experiment.ipinyou.nn import simple
-# from experiment.ipinyou.nn.train import train_model__
-from experiment.ipinyou.onehot.algo import SKLearnMLPRunner, SKLearnLRRunner, MLPRunner, DeepWideRunner
+# from experiment.ipinyou.onehot.encoder import MyOneHotEncoder
 
 from random import randrange
 
@@ -70,7 +67,7 @@ if __name__ == '__main__':
         # sample_ids
         list(range(15)),
         # bins
-        [1, 5, 10, 50, 150, 300],
+        [1],
         # alpha
         [0.1, 1.0],
         # hidden
@@ -83,15 +80,13 @@ if __name__ == '__main__':
     sk_auc = []
     torch_auc = []
     elapsed_time = []
-    start = time.time()
 
     prev_subject = None
     df_train, df_test = (None, None)
 
     sk_learn_mlp = SKLearnMLPRunner().set_measure(measure)
     sk_learn_lr = SKLearnLRRunner().set_measure(measure)
-    mlp = MLPRunner().set_measure(measure)
-    dw = DeepWideRunner().set_measure(measure)
+    mlp = MLPRunner("run_a").set_measure(measure)
     use_bck = False
 
     d_mgr = DataManager()
@@ -128,43 +123,40 @@ if __name__ == '__main__':
             "n_iter_no_change": 10
         }
 
-        # print(1. / alpha / 1000000)
-        # sk_learn_lr.run({"train": X_train, "test": X_test},
-        #                 {"train": y_train, "test": y_test},
-        #                 subject + f";encoding=oh;features={X_train.shape[1]}",
-        #                 random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
-        # sk_learn_mlp.run({"train": X_train, "test": X_test},
-        #                  {"train": y_train, "test": y_test},
-        #                  subject + f";encoding=oh;features={X_train.shape[1]}",
-        #                  **nn_params)
-        # mlp.run({"train": X_train, "test": X_test},
-        #         {"train": y_train, "test": y_test},
-        #         subject + f";encoding=oh;features={X_train.shape[1]}",
-        #         **nn_params)
-        dw.run({"train": X_train, "test": X_test},
-               {"train": y_train, "test": y_test},
-               subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
-               **nn_params)
-        sk_learn_lr.run({"train": X_train_agge, "test": X_test_agge},
+        print(1. / alpha / 1000000)
+        sk_learn_lr.run({"train": X_train, "test": X_test},
                         {"train": y_train, "test": y_test},
-                        subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+                        subject + f";encoding=oh;features={X_train.shape[1]}",
                         random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
-        sk_learn_mlp.run({"train": X_train_agge, "test": X_test_agge},
+        sk_learn_mlp.run({"train": X_train, "test": X_test},
                          {"train": y_train, "test": y_test},
-                         subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+                         subject + f";encoding=oh;features={X_train.shape[1]}",
                          **nn_params)
-        mlp.run({"train": X_train_agge, "test": X_test_agge},
+        mlp.run({"train": X_train, "test": X_test},
                 {"train": y_train, "test": y_test},
-                subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+                subject + f";encoding=oh;features={X_train.shape[1]}",
                 **nn_params)
+
+        # sk_learn_lr.run({"train": X_train_agge, "test": X_test_agge},
+        #                 {"train": y_train, "test": y_test},
+        #                 subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+        #                 random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
+        # sk_learn_mlp.run({"train": X_train_agge, "test": X_test_agge},
+        #                  {"train": y_train, "test": y_test},
+        #                  subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+        #                  **nn_params)
+        # mlp.run({"train": X_train_agge, "test": X_test_agge},
+        #         {"train": y_train, "test": y_test},
+        #         subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
+        #         **nn_params)
         if experiment_id % 100 == 0:
             measure.print()
 
         print(f"writing results_{experiment_id % 5}.pickle")
-        measure.to_pandas().to_pickle(f"results_{experiment_id % 5}.pickle")
+        measure.to_pandas().to_pickle(f"results__6_{experiment_id % 5}.pickle")
 
     print('-------------------------------- RESULT --------------------------------')
-    measure.to_pandas().to_pickle("results__5.pickle")
+    measure.to_pandas().to_pickle("results__6.pickle")
     print(measure.to_pandas())
     plt.figure()
     plt.plot(sk_auc, label='sk')
@@ -183,4 +175,46 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
     plt.savefig('./model_time.png')
-    plt.savefig('./model_time.png')
+
+    '''
+    
+        X_train = _df_train[['weekday', 'hour',  # 'timestamp',
+                 'useragent', 'region', 'city', 'adexchange',
+                 'slotwidth', 'slotheight',
+                 'slotvisibility', 'slotformat', 'slotprice_bucket',  # 'slotprice',
+                 'creative',  # 'bidprice', #'payprice',
+                 'keypage', 'advertiser']].to
+        
+        y_train = _df_train.click.astype('float64')
+
+
+        X_test = _df_test[['weekday', 'hour',  # 'timestamp',
+                 'useragent', 'region', 'city', 'adexchange',
+                 'slotwidth', 'slotheight',
+                 'slotvisibility', 'slotformat', 'slotprice_bucket',  # 'slotprice',
+                 'creative',  # 'bidprice', #'payprice',
+                 'keypage', 'advertiser']].astype('float64')
+
+        y_test = _df_test.click.astype('float64')
+
+        
+        
+        
+        hfe = train_encoder(_df_train, size=dims)
+        X_train = hfe.transform(_df_train).astype('float64')
+        y_train = _df_train.click.to_numpy().astype('float64')
+        X_test = hfe.transform(_df_test).astype('float64')
+        y_test = _df_test.click.to_numpy().astype('float64')
+
+        measure.set_suffix('_1_None_f={}_b=-1_bt=-1'.format(X_train.shape[1]))
+        measure.start(subject)
+        lr = LogisticRegression(random_state=0, max_iter=10000, verbose=0, solver='lbfgs').fit(X_train, y_train)
+        auc = show_auc(lr, X_test, y_test, name=subject)
+        measure.data_point(auc, collection='auc_{}'.format(subject))
+        measure.stop(subject)
+        measure.print()
+        print('Done experiment id={}, adv={}, dims={}, attempt={}'.format(experiment_id, subject, dims, attempt))
+
+
+        w poszukiwaniu optymalnych parametrów deterministycznego modelu wzrostu wartości przedsiębiorstwa
+    '''

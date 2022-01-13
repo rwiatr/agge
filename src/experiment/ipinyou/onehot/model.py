@@ -1,12 +1,9 @@
-
-import os, sys
-sys.path.append(os.getcwd())
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-import os
 import torch.optim.lr_scheduler as lr_scheduler
+from experiment.display_bis import show_auc
 
 
 class Mlp(nn.Module):
@@ -15,16 +12,16 @@ class Mlp(nn.Module):
         # input layer
         self.input_layer = nn.Linear(input_size, hidden_layers_sizes[0], bias=bias)
         self.relu = nn.ReLU()
-       
+
         # hidden layers
         self.linears_relus = nn.ModuleList()
-        for i in range(len(hidden_layers_sizes)-1):
-            self.linears_relus.append(nn.Linear(hidden_layers_sizes[i], hidden_layers_sizes[i+1]))
+        for i in range(len(hidden_layers_sizes) - 1):
+            self.linears_relus.append(nn.Linear(hidden_layers_sizes[i], hidden_layers_sizes[i + 1]))
             self.linears_relus.append(nn.ReLU())
 
-        #output layer
-        self.output_layer = nn.Linear(hidden_layers_sizes[-1], output_size)     
-    
+        # output layer
+        self.output_layer = nn.Linear(hidden_layers_sizes[-1], output_size)
+
     def forward(self, data_input):
         x = self.input_layer(data_input)
         x = self.relu(x)
@@ -64,9 +61,9 @@ class DeepWide(nn.Module):
     def __init__(self, input_size, output_size, hidden_layers_sizes):
         super(DeepWide, self).__init__()
 
-        #deep
-        self.embedding = nn.Linear(input_size, int(input_size//2), bias=False)
-        self.input_layer = nn.Linear(int(input_size//2), hidden_layers_sizes[0])
+        # deep
+        self.embedding = nn.Linear(input_size, int(input_size // 2), bias=False)
+        self.input_layer = nn.Linear(int(input_size // 2), hidden_layers_sizes[0])
 
         self.relu = nn.ReLU()
 
@@ -78,19 +75,19 @@ class DeepWide(nn.Module):
 
         # connect deep n wide
         self.output_layer = nn.Linear(hidden_layers_sizes[-1] + input_size, output_size)
-    
+
     def forward(self, data_input):
-        
-        #deep forward
+
+        # deep forward
         x = self.embedding(data_input)
         x = self.input_layer(x)
         x = self.relu(x)
         for seq in self.linears_relus:
             x = seq(x)
 
-        #deep n wide
+        # deep n wide
         dw_input = torch.cat((x, data_input), dim=1)
-        
+
         out = torch.sigmoid(self.output_layer(dw_input))
         return out
 
@@ -123,14 +120,14 @@ class DeepWide(nn.Module):
 class HandleDaset(Dataset):
     def __init__(self, x, y):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
         self.x = self.sparse_to_tensor(x).to(device)
-        #self.x = torch.tensor(x,dtype=torch.float32)
-        self.y = torch.tensor(y,dtype=torch.float32).to(device)
+        # self.x = torch.tensor(x,dtype=torch.float32)
+        self.y = torch.tensor(y, dtype=torch.float32).to(device)
         self.length = self.x.shape[0]
- 
-    def __getitem__(self,idx):
-        return self.x[idx],self.y[idx]  
+
+    def __getitem__(self, idx):
+        return self.x[idx], self.y[idx]
+
     def __len__(self):
         return self.length
 
@@ -142,17 +139,16 @@ class HandleDaset(Dataset):
         
         """
 
-        samples=data.shape[0]
-        features=data.shape[1]
-        values=data.data
-        coo_data=data.tocoo()
-        indices=torch.LongTensor([coo_data.row,coo_data.col])
-        t=torch.sparse.FloatTensor(indices,torch.from_numpy(values).float(),[samples,features])
-        t=torch.sparse_coo_tensor(data)
+        samples = data.shape[0]
+        features = data.shape[1]
+        values = data.data
+        coo_data = data.tocoo()
+        indices = torch.LongTensor([coo_data.row, coo_data.col])
+        t = torch.sparse.FloatTensor(indices, torch.from_numpy(values).float(), [samples, features])
+        t = torch.sparse_coo_tensor(data)
         return t
-    
-    def sparse_to_tensor(self, sparse_m):
 
+    def sparse_to_tensor(self, sparse_m):
         if type(sparse_m) is np.ndarray:
             return torch.from_numpy(sparse_m).float()
         sparse_m = sparse_m.tocoo()
@@ -181,6 +177,7 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
         patience = epochs
     stop = EarlyStop(patience=patience, max_epochs=epochs, handler=handler, tol=tol)
 
+    perut = torch.randperm(X.shape[0])
     # train vali split
     n = X.shape[0]
     perut = torch.randperm(X.shape[0])
@@ -198,11 +195,11 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
     # determine a device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'The device used for training is: {device}')
-    
+
     model.to(device)
     print(f'Cuda?: ', next(model.parameters()).is_cuda)
     # loss and optimizer
-    
+
     loss_fn = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay, eps=epsilon, betas=(beta_1, beta_2))
     nn.L1Loss
@@ -231,10 +228,9 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
             train_loss += loss.item()
             train_steps += 1
 
-
+        val_loss = 0.0
         model.eval()
         val_steps = 0
-        val_loss = 0.0
         with torch.no_grad():
             for batch_id, (X, y) in enumerate(validationloader):
                 outputs = model(X)
@@ -245,7 +241,6 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
         if stabilization > 0:
             stabilization -= 1
         else:
-            val_steps = 1 if val_steps == 0 else val_steps
             stop.update_epoch_loss(validation_loss=np.abs(val_loss / val_steps),
                                    train_loss=np.abs(train_loss / train_steps))
 
@@ -265,6 +260,7 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
         epoch += 1
 
     return handler
+
 
 class EarlyStop:
 
@@ -286,6 +282,7 @@ class EarlyStop:
         self.train_losses.append(train_loss)
         self.val_losses.append(validation_loss)
         self.epoch += 1
+        # TODO if no val losses calc on train losses
         if len(self.val_losses) > 1:
             self.tol_problem = abs(self.val_losses[-2] - self.val_losses[-1]) < self.tol
 
@@ -344,25 +341,3 @@ class ModelHandler:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-if __name__ == '__main__':
-    hello = 'hi'
-
-    print(type(hello))
-    
-    if type(hello) == 'str':
-        print(hello)
