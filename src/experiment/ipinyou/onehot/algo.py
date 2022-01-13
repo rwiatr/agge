@@ -60,7 +60,7 @@ class MLPRunner(AlgoRunner):
         self.experiment_id = experiment_id
 
     def algo(self, subject, X, y, **properties):
-        mlp = define_model(X['train'].shape[1], 1, hidden_layer_sizes=properties['hidden_layer_sizes'])
+        mlp = define_model(X['train'].shape[1], 1, hidden_layer_sizes=properties['hidden_layer_sizes'], bias=False)
         mlp.apply(init_weights)
         handler = train_model(model=mlp, X=X['train'], y=y['train'],
                               lr=properties['learning_rate_init'],
@@ -72,7 +72,7 @@ class MLPRunner(AlgoRunner):
                               tol=properties['tol'],
                               epsilon=properties['epsilon'],
                               early_stop=properties['early_stopping'],
-                              verbose = False,
+                              # verbose=False,
                               experiment_id=self.experiment_id)
         handler.best()
         auc = self.to_auc(mlp, subject, X, y)
@@ -100,7 +100,8 @@ class DeepWideRunner(AlgoRunner):
                               tol=properties['tol'],
                               epsilon=properties['epsilon'],
                               early_stop=properties['early_stopping'],
-                              verbose = False)
+                              # verbose = False
+                              )
 
         handler.best()
         auc = self.to_auc(dw, subject, X, y)
@@ -112,6 +113,6 @@ class DeepWideRunner(AlgoRunner):
 def init_weights(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.xavier_uniform_(m.weight)
-        m.bias.data.fill_(0.01)
-
+        if m.bias is not None:
+            m.bias.data.fill_(0.01)
 

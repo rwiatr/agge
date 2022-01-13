@@ -3,33 +3,38 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import torch.optim.lr_scheduler as lr_scheduler
-from experiment.display_bis import show_auc
 
 
 class Mlp(nn.Module):
-    def __init__(self, input_size, output_size, hidden_layers_sizes, bias=False):
+    def __init__(self, input_size, output_size, hidden_layers_sizes, bias=False, relu_embeddings=True):
         super(Mlp, self).__init__()
         # input layer
-        self.input_layer = nn.Linear(input_size, hidden_layers_sizes[0], bias=bias)
-        self.relu = nn.ReLU()
+        self.embedding = nn.ModuleList()
+        self.embedding.append(nn.Linear(input_size, hidden_layers_sizes[0], bias=bias))
+        if relu_embeddings:
+            self.embedding.append(nn.ReLU())
 
         # hidden layers
-        self.linears_relus = nn.ModuleList()
-        for i in range(len(hidden_layers_sizes) - 1):
-            self.linears_relus.append(nn.Linear(hidden_layers_sizes[i], hidden_layers_sizes[i + 1]))
-            self.linears_relus.append(nn.ReLU())
+        self.hidden = nn.ModuleList()
+        for i in range(hidden_layers_sizes[1] - 1):
+            self.hidden.append(nn.Linear(hidden_layers_sizes[0], hidden_layers_sizes[0]))
+            self.hidden.append(nn.ReLU())
 
         # output layer
-        self.output_layer = nn.Linear(hidden_layers_sizes[-1], output_size)
+        self.output_layer = nn.Linear(hidden_layers_sizes[0], output_size)
 
-    def forward(self, data_input):
-        x = self.input_layer(data_input)
-        x = self.relu(x)
-        for seq in self.linears_relus:
-            x = seq(x)
+        print(self)
 
-        out = torch.sigmoid(self.output_layer(x))
-        return out
+    def forward(self, x):
+        for net in self.embedding:
+            x = net(x)
+        for net in self.hidden:
+            x = net(x)
+        x = self.output_layer(x)
+
+        x = torch.sigmoid(x)
+
+        return x
 
     def decision_function(self, X):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -58,38 +63,38 @@ class Mlp(nn.Module):
 
 
 class DeepWide(nn.Module):
-    def __init__(self, input_size, output_size, hidden_layers_sizes):
+    def __init__(self, input_size, output_size, hidden_layers_sizes, bias=False, relu_embeddings=True):
         super(DeepWide, self).__init__()
 
         # deep
-        self.embedding = nn.Linear(input_size, int(input_size // 2), bias=False)
-        self.input_layer = nn.Linear(int(input_size // 2), hidden_layers_sizes[0])
-
-        self.relu = nn.ReLU()
+        self.embedding = nn.ModuleList()
+        self.embedding.append(nn.Linear(input_size, hidden_layers_sizes[0], bias=bias))
+        if relu_embeddings:
+            self.embedding.append(nn.ReLU())
 
         # hidden layers
-        self.linears_relus = nn.ModuleList()
-        for i in range(len(hidden_layers_sizes) - 1):
-            self.linears_relus.append(nn.Linear(hidden_layers_sizes[i], hidden_layers_sizes[i + 1]))
-            self.linears_relus.append(nn.ReLU())
+        self.hidden = nn.ModuleList()
+        for i in range(hidden_layers_sizes[1] - 1):
+            self.hidden.append(nn.Linear(hidden_layers_sizes[0], hidden_layers_sizes[0]))
+            self.hidden.append(nn.ReLU())
 
         # connect deep n wide
-        self.output_layer = nn.Linear(hidden_layers_sizes[-1] + input_size, output_size)
+        self.output_layer = nn.Linear(hidden_layers_sizes[0] + input_size, output_size)
 
-    def forward(self, data_input):
+        print(self)
 
+    def forward(self, input_data):
+        x = input_data
         # deep forward
-        x = self.embedding(data_input)
-        x = self.input_layer(x)
-        x = self.relu(x)
-        for seq in self.linears_relus:
+        for net in self.embedding:
+            x = net(x)
+        for seq in self.hidden:
             x = seq(x)
-
         # deep n wide
-        dw_input = torch.cat((x, data_input), dim=1)
+        x = torch.cat((x, input_data), dim=1)
+        x = self.output_layer(x)
 
-        out = torch.sigmoid(self.output_layer(dw_input))
-        return out
+        return torch.sigmoid(x)
 
     def decision_function(self, X):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -163,34 +168,35 @@ class HandleDaset(Dataset):
 
         return torch.sparse.FloatTensor(i, v, torch.Size(shape)).to_dense()
 
+
 def define_model(input_size, output_size, hidden_layer_sizes, bias):
     return Mlp(input_size, output_size, hidden_layer_sizes, bias)
+
 
 def prep_data(X, y, batch_size, shuffle=False):
     return DataLoader(HandleDaset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
+
 def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience=5, stabilization=0,
-                validation_fraction=0.1, tol=0, epsilon=1e-8, beta_1 = 0.9, beta_2 = 0.999, early_stop=True, verbose=False):
+                validation_fraction=0.1, tol=0, epsilon=1e-8, beta_1=0.9, beta_2=0.999, early_stop=True,
+                verbose=True, experiment_id=None):
     # define model handler and early top
-    handler = ModelHandler(model, './model')
-    if not early_stop:
-        patience = epochs
+    handler = ModelHandler(model, './model' if experiment_id is None else f'./model_{experiment_id}')
     stop = EarlyStop(patience=patience, max_epochs=epochs, handler=handler, tol=tol)
 
-    perut = torch.randperm(X.shape[0])
     # train vali split
     n = X.shape[0]
     perut = torch.randperm(X.shape[0])
-    train_fraction = (1-validation_fraction)
+    train_fraction = (1 - validation_fraction)
 
-    X_train = X[perut][0: int(n*train_fraction)]
-    y_train = y[perut][0: int(n*train_fraction)]
-    X_val = X[perut][int(n*train_fraction):]
-    y_val = y[perut][int(n*train_fraction):]
+    X_train = X[perut][0: int(n * train_fraction)]
+    y_train = y[perut][0: int(n * train_fraction)]
+    X_val = X[perut][int(n * train_fraction):]
+    y_val = y[perut][int(n * train_fraction):]
 
     # tensorize and batch data
     trainloader = prep_data(X_train, y_train, batch_size=batch_size)
-    validationloader = prep_data(X_val, y_val, batch_size=batch_size)
+    validationloader = prep_data(X_val, y_val, batch_size=batch_size) if validation_fraction > 0 else trainloader
 
     # determine a device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -201,13 +207,13 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
     # loss and optimizer
 
     loss_fn = nn.BCELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay, eps=epsilon, betas=(beta_1, beta_2))
-    nn.L1Loss
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay, eps=epsilon,
+                                 betas=(beta_1, beta_2))
+    # nn.L1Loss
     # scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience // 3, factor=0.5)
 
     # training loop
-    n_total_steps = len(trainloader)
     epoch = 1
     while not stop.is_stop():
         train_steps = 0
@@ -282,12 +288,10 @@ class EarlyStop:
         self.train_losses.append(train_loss)
         self.val_losses.append(validation_loss)
         self.epoch += 1
-        # TODO if no val losses calc on train losses
         if len(self.val_losses) > 1:
             self.tol_problem = abs(self.val_losses[-2] - self.val_losses[-1]) < self.tol
 
         if self.is_best_loss:
-            print('updating best model')
             self.best_loss = validation_loss
             if self.tol_problem:
                 self.failures += 1
@@ -295,6 +299,8 @@ class EarlyStop:
                 self.failures = 0
         else:
             self.failures += 1
+        print(f'epoch={self.epoch}/{self.max_epochs}, failures={self.failures}/{self.patience}, '
+              f'best_loss={self.is_best_loss}, tol={self.tol}, tol_failure={self.tol_problem}')
 
     def is_best(self):
         return self.is_best_loss
@@ -338,6 +344,3 @@ class ModelHandler:
             self.best_loss = loss
             self.success_updates += 1
             return True
-
-
-
