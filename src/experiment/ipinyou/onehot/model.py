@@ -16,12 +16,12 @@ class Mlp(nn.Module):
 
         # hidden layers
         self.hidden = nn.ModuleList()
-        for i in range(hidden_layers_sizes[1] - 1):
-            self.hidden.append(nn.Linear(hidden_layers_sizes[0], hidden_layers_sizes[0]))
+        for i in range(len(hidden_layers_sizes) - 1):
+            self.hidden.append(nn.Linear(hidden_layers_sizes[i], hidden_layers_sizes[i + 1]))
             self.hidden.append(nn.ReLU())
 
-        # output layer
-        self.output_layer = nn.Linear(hidden_layers_sizes[0], output_size)
+        # connect deep n wide
+        self.output_layer = nn.Linear(hidden_layers_sizes[-1], output_size)
 
         print(self)
 
@@ -74,12 +74,12 @@ class DeepWide(nn.Module):
 
         # hidden layers
         self.hidden = nn.ModuleList()
-        for i in range(hidden_layers_sizes[1] - 1):
-            self.hidden.append(nn.Linear(hidden_layers_sizes[0], hidden_layers_sizes[0]))
+        for i in range(len(hidden_layers_sizes) - 1):
+            self.hidden.append(nn.Linear(hidden_layers_sizes[i], hidden_layers_sizes[i + 1]))
             self.hidden.append(nn.ReLU())
 
         # connect deep n wide
-        self.output_layer = nn.Linear(hidden_layers_sizes[0] + input_size, output_size)
+        self.output_layer = nn.Linear(hidden_layers_sizes[-1] + input_size, output_size)
 
         print(self)
 

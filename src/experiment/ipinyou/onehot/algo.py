@@ -7,6 +7,9 @@ from experiment.ipinyou.onehot.model import DeepWide, define_model, train_model
 from experiment.measure import ProcessMeasure
 import torch.nn as nn
 
+from deepctr_torch.models import *
+from sklearn.metrics import log_loss, roc_auc_score
+
 
 class AlgoRunner:
     def __init__(self, name):
@@ -109,6 +112,51 @@ class DeepWideRunner(AlgoRunner):
         return {**self.to_auc(dw, subject, X, y),
                 "best_model_test": auc['test'],
                 "best_model_train": auc['train']}
+
+class DeepFMRunner(AlgoRunner):
+    def __init__(self):
+        super(DeepFMRunner, self).__init__("DeepFM")
+
+    def algo(self, subject, X, y , linear_feature_columns, dnn_feature_columns, **properties):
+        model = DeepFM(linear_feature_columns = linear_feature_columns, dnn_feature_columns=dnn_feature_columns, dnn_hidden_units=properties['hidden_layer_sizes'], task='binary',
+                   l2_reg_embedding=1e-5, device='cpu')
+        
+        model.compile('adagrad', 'binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
+        history = model.fit(x=X['train'], y=y['train'], batch_size=properties['batch_size'], epochs=properties['max_iter'], verbose=0, validation_split=0)
+
+        
+        test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)
+        return {"test": test_auc}
+
+class WDLRunner(AlgoRunner):
+    def __init__(self):
+        super(WDLRunner, self).__init__("wdl")
+
+    def algo(self, subject, X, y , linear_feature_columns, dnn_feature_columns, **properties):
+        model = WDL(linear_feature_columns = linear_feature_columns, dnn_feature_columns=dnn_feature_columns, dnn_hidden_units=properties['hidden_layer_sizes'], task='binary',
+                   l2_reg_embedding=1e-5, device='cpu')
+        
+        model.compile('adagrad', 'binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
+        history = model.fit(x=X['train'], y=y['train'], batch_size=properties['batch_size'], epochs=properties['max_iter'], verbose=0, validation_split=0)
+
+        
+        test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)
+        return {"test": test_auc}
+
+class DCNRunner(AlgoRunner):
+    def __init__(self):
+        super(DCNRunner, self).__init__("dcn")
+
+    def algo(self, subject, X, y , linear_feature_columns, dnn_feature_columns, **properties):
+        model = DCN(linear_feature_columns = linear_feature_columns, dnn_feature_columns=dnn_feature_columns, dnn_hidden_units=properties['hidden_layer_sizes'], task='binary',
+                   l2_reg_embedding=1e-5, device='cpu')
+        
+        model.compile('adagrad', 'binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
+        history = model.fit(x=X['train'], y=y['train'], batch_size=properties['batch_size'], epochs=properties['max_iter'], verbose=0, validation_split=0)
+
+        
+        test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)
+        return {"test": test_auc}
 
 def init_weights(m):
     if isinstance(m, nn.Linear):

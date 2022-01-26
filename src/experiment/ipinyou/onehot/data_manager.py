@@ -4,6 +4,9 @@ from experiment.ipinyou.agge.agge_handle import AggeHandle
 from experiment.ipinyou.load import read_data
 from experiment.ipinyou.agge.run import neg_sample
 
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+from deepctr_torch.inputs import SparseFeat, DenseFeat, get_feature_names
+
 
 class DataManager:
 
@@ -53,6 +56,10 @@ class DataManager:
                 'creative',  # 'bidprice', #'payprice',
                 'keypage', 'advertiser']
 
+
+        dense_features = ['weekday', 'hour', 'region',  'city', 'slotwidth', 'slotheight', 'slotprice_bucket']
+        sparse_features = [col_name for col_name in cols if col_name not in dense_features]
+
         if self.new_sample or self.new_subject or self.new_bins:
             print('ENCODING...')
             enc = OneHotEncoder(handle_unknown='ignore')
@@ -69,10 +76,46 @@ class DataManager:
             agge_handler = AggeHandle(bins=bins)
             X_train_agge, X_test_agge = \
                 agge_handler.fit_and_convert(self._df_train[cols + ['click']], self._df_test[cols + ['click']])
+
+
+            print('LABEL ENCODING AND TRANSFORMATION')
+            linear_features_columns_list, dnn_features_columns_list, model_inputs = self.get_sparse_dense_data(dense_features, sparse_features)
+
+
             print('ENCODING FINISHED!')
 
-            self.capture = X_train, y_train, X_test, y_test, X_train_agge, X_test_agge
+            self.capture = X_train, y_train, X_test, y_test, X_train_agge, X_test_agge, linear_features_columns_list, dnn_features_columns_list, model_inputs
         else:
             print("SKIP ENCODING, USING CAPTURED")
-
+        
         return self.capture
+
+    def get_sparse_dense_data(self, dense_features, sparse_features):
+
+        dnn_feature_columns_list = []
+        linear_feature_columns_list = []
+        model_inputs = []
+
+        for data in [self._df_train, self._df_test]:
+            # 1.Label Encoding for sparse features,and do simple Transformation for dense features
+            for feat in sparse_features:
+                lbe = LabelEncoder()
+                data[feat] = lbe.fit_transform(data[feat])
+            mms = MinMaxScaler(feature_range=(0, 1))
+            data[dense_features] = mms.fit_transform(data[dense_features])
+
+        # 2.count #unique features for each sparse field,and record dense feature field name
+
+            fixlen_feature_columns = [SparseFeat(feat, data[feat].nunique())
+                                    for feat in sparse_features] + [DenseFeat(feat, 1, )
+                                                                    for feat in dense_features]
+
+            dnn_feature_columns_list += [fixlen_feature_columns]
+            linear_feature_columns_list += [fixlen_feature_columns]
+
+            feature_names = get_feature_names(
+                fixlen_feature_columns + fixlen_feature_columns)
+
+            model_inputs += [{name: data[name] for name in feature_names}]
+
+        return linear_feature_columns_list, dnn_feature_columns_list, model_inputs
