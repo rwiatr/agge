@@ -1,11 +1,12 @@
 import os
 import sys
 
-from experiment.ipinyou.onehot.data_manager import DataManager
+from experiment.ipinyou.onehot.data_manager import DataManager, datasets
 
 sys.path.append(os.getcwd())
 
-from experiment.ipinyou.onehot.algo import SKLearnMLPRunner, SKLearnLRRunner, MLPRunner, DeepWideRunner
+from experiment.ipinyou.onehot.algo import SKLearnMLPRunner, SKLearnLRRunner, MLPRunner, DeepWideRunner, \
+    DeepWideRunnerV2
 
 import pandas as pd
 from experiment.measure import ProcessMeasure
@@ -48,17 +49,17 @@ if __name__ == '__main__':
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
         ['2261', '2821', '2997'],
         # sample_ids
-        list(range(15)),
+        list(range(10)),
         # bins
-        [150],
+        [50, 150, 300],
         # [1, 5, 10, 50, 150, 300],
         # alpha
-        [0.001, 0.01, 0.1],
+        [0.0001, 0.001],
         # hidden
         [32],
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
-        start=0)
+        start=96)
     print(experiments)
 
     sk_auc = []
@@ -69,22 +70,26 @@ if __name__ == '__main__':
     prev_subject = None
     df_train, df_test = (None, None)
 
+    output = "exp"
+
     sk_learn_mlp = SKLearnMLPRunner().set_measure(measure)
     sk_learn_lr = SKLearnLRRunner().set_measure(measure)
-    mlp = MLPRunner().set_measure(measure)
-    dw = DeepWideRunner().set_measure(measure)
-    use_bck = False
+    mlp = MLPRunner(output).set_measure(measure)
+    dw = DeepWideRunner(output).set_measure(measure)
+    dwv2 = DeepWideRunnerV2(output).set_measure(measure)
 
     d_mgr = DataManager()
 
-    prev_bins = None
-    output = "result__10"
+    conj = False
 
     for experiment_id, (subject, sample_id, bins, alpha, hidden) in experiments:
         print(f"EXPERIMENT {experiment_id}/{len(experiments)}, data={(subject, sample_id, bins, alpha, hidden)}")
-        X_train, y_train, X_test, y_test, X_train_agge, X_test_agge = d_mgr.get_data(subject, bins, sample_id)
+        X, y, cols, conj_cols = \
+            d_mgr.get_data(subject, bins, sample_id, conj=conj)
+        ohe_dataset = datasets(X, y)
+        agge_ds = datasets(X, y, agge=True)
 
-        print("feature size of agge", X_train_agge.shape[1])
+        print("feature size of agge", agge_ds[0]['train'].shape[1])
         hidden_sizes = (hidden, 4)
 
         nn_params = {
@@ -98,9 +103,9 @@ if __name__ == '__main__':
             # "power_t": 0.5,
             "max_iter": 50,  # implement
             # "shuffle": True, # always true
-            "validation_fraction": 0.2,  # implement
+            "validation_fraction": 0.0,  # implement
             # "random_state":None,
-            "tol": 1e-5,  # implement OR make sure its low
+            "tol": 1e-4,  # implement OR make sure its low
             # "warm_start": False,
             # "momentum": 0.9,
             # "nesterovs_momentum": True,
@@ -112,39 +117,15 @@ if __name__ == '__main__':
             "n_iter_no_change": 5
         }
 
-        # print(1. / alpha / 1000000)
-        # sk_learn_lr.run({"train": X_train, "test": X_test},
-        #                 {"train": y_train, "test": y_test},
-        #                 subject + f";encoding=oh;features={X_train.shape[1]}",
-        #                 random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
-        # sk_learn_mlp.run({"train": X_train, "test": X_test},
-        #                  {"train": y_train, "test": y_test},
-        #                  subject + f";encoding=oh;features={X_train.shape[1]}",
-        #                  **nn_params)
-        mlp.run({"train": X_train, "test": X_test},
-                {"train": y_train, "test": y_test},
-                subject + f";encoding=oh;features={X_train.shape[1]}",
-                **nn_params)
-        dw.run({"train": X_train, "test": X_test},
-               {"train": y_train, "test": y_test},
-               subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
-               **nn_params)
-        # sk_learn_lr.run({"train": X_train_agge, "test": X_test_agge},
-        #                 {"train": y_train, "test": y_test},
-        #                 subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
-        #                 random_state=0, max_iter=10000, verbose=1, solver='lbfgs', C=1. / alpha / 1000000)
-        # sk_learn_mlp.run({"train": X_train_agge, "test": X_test_agge},
-        #                  {"train": y_train, "test": y_test},
-        #                  subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
-        #                  **nn_params)
-        mlp.run({"train": X_train_agge, "test": X_test_agge},
-                {"train": y_train, "test": y_test},
-                subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
-                **nn_params)
-        dw.run({"train": X_train_agge, "test": X_test_agge},
-               {"train": y_train, "test": y_test},
-               subject + f";encoding=agge;features={X_train_agge.shape[1]};bins={bins}",
-               **nn_params)
+        # ohe_string = subject + f";encoding=oh;features={ohe_dataset[0]['train'].shape[1]};" \
+        #                        f"features_conj={ohe_dataset[0]['train_conj'].shape[1]};conj={conj};bins={bins}"
+        # mlp.run(*ohe_dataset, ohe_string, **nn_params)
+        # dw.run(*ohe_dataset, ohe_string, **nn_params)
+
+        agge_string = subject + f";encoding=agge;features={agge_ds[0]['train'].shape[1]}bins={bins}"
+        mlp.run(*agge_ds, agge_string, **nn_params)
+        dw.run(*agge_ds, agge_string, **nn_params)
+        dwv2.run(*agge_ds, agge_string, **nn_params)
 
         if experiment_id % 100 == 0:
             measure.print()

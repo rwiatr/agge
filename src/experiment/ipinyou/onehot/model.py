@@ -1,3 +1,6 @@
+import time
+
+import scipy.sparse
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -136,26 +139,10 @@ class HandleDaset(Dataset):
     def __len__(self):
         return self.length
 
-    def spy_sparse2torch_sparse(self, data):
-        """
-
-        :param data: a scipy sparse csr matrix
-        :return: a sparse torch tensor
-        
-        """
-
-        samples = data.shape[0]
-        features = data.shape[1]
-        values = data.data
-        coo_data = data.tocoo()
-        indices = torch.LongTensor([coo_data.row, coo_data.col])
-        t = torch.sparse.FloatTensor(indices, torch.from_numpy(values).float(), [samples, features])
-        t = torch.sparse_coo_tensor(data)
-        return t
-
     def sparse_to_tensor(self, sparse_m):
         if type(sparse_m) is np.ndarray:
             return torch.from_numpy(sparse_m).float()
+
         sparse_m = sparse_m.tocoo()
 
         values = sparse_m.data
@@ -169,11 +156,140 @@ class HandleDaset(Dataset):
         return torch.sparse.FloatTensor(i, v, torch.Size(shape)).to_dense()
 
 
+class HandleDaset2(Dataset):
+    def __init__(self, x, y):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.x = x.tocsr()
+        self.y = torch.tensor(y, dtype=torch.float32).to(device)
+        self.length = self.x.shape[0]
+        self.device = device
+
+    def __getitem__(self, idx):
+        return torch.tensor(self.x.getrow(idx).toarray().reshape(-1),
+                            dtype=torch.float).to(self.device), self.y[idx]
+
+    def __len__(self):
+        return self.length
+
+
+class HandleDaset3(Dataset):
+    def __init__(self, x, y):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.x = self.sparse_to_tensor(scipy.sparse.csr_matrix(x))
+        self.y = torch.tensor(y, dtype=torch.float32).to(self.device)
+        self.length = self.x.shape[0]
+
+    def __getitem__(self, idx):
+        return self.x[idx].to_dense(), self.y[idx]
+
+    def __len__(self):
+        return self.length
+
+    # def sparse_to_tensor(self, sparse_m):
+    #     if type(sparse_m) is np.ndarray:
+    #         return torch.from_numpy(sparse_m).float()
+    #     coo = sparse_m.tocoo()
+    #     values = torch.FloatTensor(sparse_m.data)
+    #     col = torch.LongTensor(coo.col)
+    #     shape = torch.Size(coo.shape)
+    #     row = torch.arange(0, shape[0] + 1, dtype=torch.int64) * 2
+    #     row[-1] = values.shape[0]
+    #     return torch.sparse_csr_tensor(
+    #         crow_indices=row, col_indices=col, values=values,
+    #         size=shape, dtype=torch.double, device=self.device
+    #     )
+
+    def sparse_to_tensor(self, sparse_m):
+        if type(sparse_m) is np.ndarray:
+            return torch.from_numpy(sparse_m).float()
+
+        sparse_m = sparse_m.tocoo()
+
+        values = sparse_m.data
+        indices = np.vstack((sparse_m.row, sparse_m.col))
+
+        i = torch.LongTensor(indices)
+        v = torch.FloatTensor(values)
+
+        shape = sparse_m.shape
+
+        return torch.sparse_coo_tensor(i, v, torch.Size(shape), device=self.device)
+
+
+class HandleDaset4(Dataset):
+    def __init__(self, x, y, batch_size=10000):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.x = x.tocsr()
+        self.y = torch.tensor(y, dtype=torch.float32).to(self.device)
+        self.length = self.x.shape[0]
+        self.request = batch_size
+        self.batch_size = batch_size
+        self.batch_id = 0
+        self.batch = None
+        self.total_requests = 0
+
+    def __getitem__(self, idx):
+        if self.total_requests == self.y.shape[0]:
+            self.request = self.batch_size
+            self.batch_id = 0
+            self.batch = None
+            self.total_requests = 0
+
+        if self.request == self.batch_size:
+            self.request = 0
+            self.batch = torch.tensor(self.x[self.batch_id * self.batch_size:
+                                             min((self.batch_id + 1) * self.batch_size, self.length)].toarray(),
+                                      device=self.device, dtype=torch.float32)
+            self.batch_id += 1
+
+        y = self.y[self.total_requests]
+        x = self.batch[self.total_requests % self.batch_size]
+
+        self.request += 1
+        self.total_requests += 1
+        return x, y
+
+    def __len__(self):
+        return self.length
+
+    # def sparse_to_tensor(self, sparse_m):
+    #     if type(sparse_m) is np.ndarray:
+    #         return torch.from_numpy(sparse_m).float()
+    #     coo = sparse_m.tocoo()
+    #     values = torch.FloatTensor(sparse_m.data)
+    #     col = torch.LongTensor(coo.col)
+    #     shape = torch.Size(coo.shape)
+    #     row = torch.arange(0, shape[0] + 1, dtype=torch.int64) * 2
+    #     row[-1] = values.shape[0]
+    #     return torch.sparse_csr_tensor(
+    #         crow_indices=row, col_indices=col, values=values,
+    #         size=shape, dtype=torch.double, device=self.device
+    #     )
+
+    def sparse_to_tensor(self, sparse_m):
+        if type(sparse_m) is np.ndarray:
+            return torch.from_numpy(sparse_m).float()
+
+        sparse_m = sparse_m.tocoo()
+
+        values = sparse_m.data
+        indices = np.vstack((sparse_m.row, sparse_m.col))
+
+        i = torch.LongTensor(indices)
+        v = torch.FloatTensor(values)
+
+        shape = sparse_m.shape
+
+        return torch.sparse_coo_tensor(i, v, torch.Size(shape), device=self.device)
+
+
 def define_model(input_size, output_size, hidden_layer_sizes, bias):
     return Mlp(input_size, output_size, hidden_layer_sizes, bias)
 
 
-def prep_data(X, y, batch_size, shuffle=False):
+def prep_data(X, y, batch_size, shuffle=False, use_sparse=True):
+    if X.shape[1] > 1000:
+        return DataLoader(HandleDaset4(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
     return DataLoader(HandleDaset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
 
@@ -207,7 +323,10 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
     # loss and optimizer
 
     loss_fn = nn.BCELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay, eps=epsilon,
+    if hasattr(model, "get_optimizer"):
+        optimizer = model.get_optimizer()
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay, eps=epsilon,
                                  betas=(beta_1, beta_2))
     # nn.L1Loss
     # scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
@@ -220,9 +339,13 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
         train_loss = 0.0
 
         model.train()
-        for i, (attributes, labels) in enumerate(trainloader):
-            # forward
-            outputs = model(attributes)
+        start = time.time()
+        iteration = 0
+        multiplying = 0.0
+        for i, (features, labels) in enumerate(trainloader):
+            m_start = time.time()
+            outputs = model(features)
+            multiplying += time.time() - m_start
             loss = loss_fn(outputs, labels.reshape(-1, 1))
 
             # backprop
@@ -233,6 +356,10 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
             optimizer.step()
             train_loss += loss.item()
             train_steps += 1
+            iteration = i + 1
+
+        total = time.time() - start
+        print(f'{iteration / total:.2f}s per run, {total:.2f}s total, {multiplying:.2f}s model execution')
 
         val_loss = 0.0
         model.eval()

@@ -1,0 +1,3 @@
+[submodule "FTRL-pytorch"]
+	path = FTRL-pytorch
+	url = https://github.com/guocheng2018/FTRL-pytorch.git

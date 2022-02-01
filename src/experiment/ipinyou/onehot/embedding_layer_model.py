@@ -213,7 +213,7 @@ def train_model(model, X, lr, epochs, batch_size, patience):
         loss_factor = 0
         loss_number = 0
         train_loss = 0.0
-        
+
         model.train()
         for i, (labels, cat, attributes) in enumerate(trainloader):
 

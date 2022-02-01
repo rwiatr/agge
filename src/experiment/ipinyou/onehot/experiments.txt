@@ -78,3 +78,31 @@ RESULTS:
     alpha: [0.000001, 0.0001, 0.01, 0.1, 1.0]
     hidden: [128] x 8
     re-runs: 15
+
+    ************** FIXED MLP AND D&W **************
+    result__10a -> result__10a_up_to_63.pickle, result__10a_from_64.pickle
+    type: agge
+    models: dw, dwv2, mlp - dwv2 damaged
+    advertisers:  ['2261', '2821', '2997']
+    bins: [50, 150, 300]
+    alpha: [0.0001, 0.001]
+    hidden: [32] x 4
+    re-runs: 10
+
+    result__10b
+    type: agge, oh x 3
+    models: mlp, dw
+    advertisers:  ['1458', '3358', '3386']
+    bins: [50, 150, 300]
+    alpha: [0.0001, 0.001]
+    hidden: [32] x 4
+    re-runs: 15
+
+    result__10c
+    type: oh
+    models: dw, dwv2, mlp - dwv2 damaged
+    advertisers:  ['2261', '2821', '2997']
+    bins: --
+    alpha: [0.0001, 0.001]
+    hidden: [32] x 4
+    re-runs: 10

@@ -42,7 +42,7 @@ def read_df(f):
     return df
 
 def read_adv(adv, set_type='test'):
-    target = IPINYOU_DATA_DIR + 'make-ipinyou-data/{}/{}.log.txt'.format(adv, set_type)
+    target = IPINYOU_DATA_DIR + '/make-ipinyou-data/{}/{}.log.txt'.format(adv, set_type)
     if not os.path.isfile(target):
         print('skip {}'.format(target))
         return None
