@@ -63,6 +63,15 @@ def f_bins(p, attempts, bins=3, bin_type='cnt'):
         result = confidence_bins(p, attempts, bins=bins)
     else:
         raise Exception("no such method ({})".format(bin_type))
+
+    unique = result.unique()
+    total = np.zeros(unique.shape)
+    count = np.zeros(unique.shape)
+    for idx, item in enumerate(result):
+        total[int(item)] += attempts[idx]
+        count[int(item)] += 1
+    mean_bin_count = total / count
+
     if result.unique().shape == 1:
         result[:] = 0
     else:
@@ -70,7 +79,7 @@ def f_bins(p, attempts, bins=3, bin_type='cnt'):
             result[result == b] = idx
     # print('unique bins ' + str(len(result.unique())))
     # print('count per bin ' + str(result.value_counts()))
-    return result
+    return result, mean_bin_count
 
 
 class MultiColEstimator:
@@ -112,8 +121,8 @@ class MultiColEstimator:
         estimation = df[[self.key_column]]
 
         if bin_count is not None and bin_count > 0:
-            self.model['bin'] = f_bins(self.model[self.value_column] / self.model['estimator_event_col'],
-                                       self.model['estimator_event_col'], bins=bin_count, bin_type=bin_type)
+            self.model['bin'], _ = f_bins(self.model[self.value_column] / self.model['estimator_event_col'],
+                                          self.model['estimator_event_col'], bins=bin_count, bin_type=bin_type)
         else:
             self.model['bin'] = 0
 
@@ -237,6 +246,9 @@ class UnaryEstimator:
 
         return estimation[result_columns]
 
+    def __calc_cols(self, bin_count=None, bin_type='cnt'):
+        sec, _ = self.__timed(lambda: self.calculate_bins(bin_count, bin_type))
+
     def __predict2(self, df, bin_count=None, bin_type='cnt'):
         result_columns = []
         estimation = df[[self.key_column]]
@@ -266,8 +278,9 @@ class UnaryEstimator:
 
     def calculate_bins(self, bin_count, bin_type):
         if bin_count is not None and bin_count > 0:
-            self.model['bin'] = f_bins(self.model[self.value_column] / self.model['estimator_event_col'],
-                                       self.model['estimator_event_col'], bins=bin_count, bin_type=bin_type)
+            self.model['bin'], self.col_counts = f_bins(
+                self.model[self.value_column] / self.model['estimator_event_col'],
+                self.model['estimator_event_col'], bins=bin_count, bin_type=bin_type)
         else:
             self.model['bin'] = 0
 

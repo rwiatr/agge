@@ -40,9 +40,11 @@ class SetHandler:
                     if conj and ht else None
                 X_test_ht_csc_conj = self.__hashing_trick2(X_test_csr_conj, "test.conj", seed_a, seed_b, sample_id) \
                     if conj and ht else None
+            else:
+                X_train_ht_csc_conj, X_test_ht_csc_conj = None, None
 
             if agge:
-                X_train_agge, X_test_agge = self.__read_and_cache_aggregates(
+                X_train_agge, X_test_agge, counts_agge = self.__read_and_cache_aggregates(
                     df_train.iloc[train_samples],
                     df_test.iloc[test_samples],
                     bins,
@@ -50,10 +52,10 @@ class SetHandler:
                     sample_id,
                     "agge")
             else:
-                X_train_agge, X_test_agge = None, None
+                X_train_agge, X_test_agge, counts_agge = None, None, None
 
             if conj and conj_agge and agge:
-                X_train_agge_conj, X_test_agge_conj = self.__read_and_cache_aggregates(
+                X_train_agge_conj, X_test_agge_conj, counts_agge_conj = self.__read_and_cache_aggregates(
                     df_train.iloc[train_samples],
                     df_test.iloc[test_samples],
                     bins,
@@ -61,7 +63,7 @@ class SetHandler:
                     sample_id,
                     "conj")
             else:
-                X_train_agge_conj, X_test_agge_conj = None, None
+                X_train_agge_conj, X_test_agge_conj, counts_agge_conj = None, None, None
 
             result = {
                 "X": {
@@ -76,6 +78,14 @@ class SetHandler:
 
                     "train_agge_conj": X_train_agge_conj,
                     "test_agge_conj": X_test_agge_conj,
+
+                    "counts_agge_conj": counts_agge_conj,
+                    "counts_agge_conj_long":
+                        np.concatenate(
+                            (np.sum(X_train_csr_cols[train_samples].toarray(), axis=0).reshape(-1), counts_agge_conj),
+                            axis=0
+                        ),
+                    "counts_agge": counts_agge,
 
                     "train_long_ht": self.__encode_long_onehot_and_additional(X_train_csr_cols, X_train_ht_csc_conj,
                                                                               "hashing", "train", None,
@@ -98,7 +108,8 @@ class SetHandler:
             }
             print("$$$$ shapes $$$$")
             for key in result['X'].keys():
-                print(f'$$$$ {key}={result["X"][key].shape} $$$$')
+                if result["X"][key] is not None:
+                    print(f'$$$$ {key}={result["X"][key].shape} $$$$')
             return result
 
         return sample
@@ -111,7 +122,7 @@ class SetHandler:
                                                                 columns)
         if self.reuse_aggregates and sample_id is not None:
             print(f"reusing aggregates {set_type}")
-            X_train_agge, X_test_agge = \
+            X_train_agge, X_test_agge, counts = \
                 self.__cached_aggregate_encode2(
                     df_train,
                     df_test,
@@ -120,7 +131,7 @@ class SetHandler:
                     sample_id,
                     set_type)
         print(f"aggregate features: {X_train_agge.shape[1]}")
-        return X_train_agge, X_test_agge
+        return X_train_agge, X_test_agge, counts
 
     def __read(self, conj=True, ht=True):
         df_train, df_test = self.__read_data()
@@ -314,9 +325,17 @@ class SetHandler:
                             extension="npz"),
                 calc_fn=lambda: __read_parts())
 
+        def __encode_counts():
+            def __gen():
+                for estimator in estimators:
+                    estimator.calculate_bins(bin_type='qcut', bin_count=bins)
+                    yield estimator.col_counts
+
+            return np.concatenate(list(__gen()), axis=0)
+
         # D: / proj / phd / cache / 2821 / aggregates / conj / bins = 45 / colhash = 2761 / sample = 0 / train.full.npz, read in 71.28
         # D: / proj / phd / cache / 2821 / aggregates / conj / bins = 45 / colhash = 2761 / sample = 0 / test.full.npz, read in 21.62
-        return __encode_df(df_train, set_type="train"), __encode_df(df_test, set_type="test")
+        return __encode_df(df_train, set_type="train"), __encode_df(df_test, set_type="test"), __encode_counts()
 
     def __encode_long_onehot_and_additional(self, oh, second, encoding, set_type, sample_id, bins):
         def __encode_parts():

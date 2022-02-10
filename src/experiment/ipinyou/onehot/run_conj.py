@@ -47,7 +47,7 @@ if __name__ == '__main__':
     experiments = generate_space([
         # advertiser ids
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'],
-        ['3476'], # 3358, 3476
+        ['3386'], # 1458
         # ['2261', '2821', '2997'], # conj_0 and 1
         # ['1458', '3358', '3386'],
         # sample_ids
@@ -65,7 +65,7 @@ if __name__ == '__main__':
         [32],
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
-        start=5)
+        start=27)
     print(experiments)
 
     sk_auc = []
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     prev_subject = None
     df_train, df_test = (None, None)
 
-    output = "conj_5"
+    output = "conj_7b"
     # output = "conj_2821_alt_long_iter"
 
     sk_learn_mlp = SKLearnMLPRunner().set_measure(measure)
@@ -99,8 +99,9 @@ if __name__ == '__main__':
             '2997': 54,
             '3427': 29,
 
-            '3358': 29,
-            '3476': 30
+            '3358': 32,
+            '3476': 30,
+            '3386': 33
         }[subject]
 
         exp = f"EXPERIMENT {experiment_id}/{len(experiments)}, " \

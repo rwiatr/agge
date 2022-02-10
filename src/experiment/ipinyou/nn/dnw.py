@@ -54,7 +54,7 @@ class DeepAndWide(nn.Module):
         return torch.sigmoid(deep + wide)
 
     def decision_function(self, X):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = get_dev()
 
         self.to(device)
         if type(X) is np.ndarray:
@@ -93,3 +93,5 @@ class CompositeOptim(optim.Optimizer):
         loss = 0
         for o in self.optims:
             loss += o.step(closure)
+        return loss
+

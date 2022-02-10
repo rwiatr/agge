@@ -97,7 +97,9 @@ class DataManager:
 
 def datasets(X, y, agge=False):
     if agge:
-        return ({"train": X['train_agge'].toarray(), "test": X['test_agge'].toarray()},
+        return ({"train": X['train_agge'].toarray(),
+                 "test": X['test_agge'].toarray(),
+                 'counts': X['counts_agge']},
                 {"train": y['train'], "test": y['test']})
     return ({"train": X['train_one_hot'], "test": X['test_one_hot']},
             {"train": y['train'], "test": y['test']})
@@ -105,9 +107,11 @@ def datasets(X, y, agge=False):
 
 def datasets_onehot_conj(X, y, agge=False):
     if agge:
-        return ({"train": X['train_long_agge'].toarray(), "test":  X['test_long_agge'].toarray()},
+        return ({"train": X['train_long_agge'].toarray(),
+                 "test": X['test_long_agge'].toarray(),
+                 'counts': X['counts_agge_conj_long']},
                 {"train": y['train'], "test": y['test']})
-    return ({"train": X['train_long_ht'], "test":  X['test_long_ht']},
+    return ({"train": X['train_long_ht'], "test": X['test_long_ht']},
             {"train": y['train'], "test": y['test']})
 
 

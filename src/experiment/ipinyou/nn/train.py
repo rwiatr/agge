@@ -9,9 +9,11 @@ import time
 
 from torch.utils.data import TensorDataset, DataLoader, random_split
 
+from experiment.ipinyou.onehot.model import get_dev
+
 
 def cuda_if_possible():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_dev()
     print(f'using {device} device')
     return device
 

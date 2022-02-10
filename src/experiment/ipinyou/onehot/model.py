@@ -40,7 +40,7 @@ class Mlp(nn.Module):
         return x
 
     def decision_function(self, X):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = get_dev()
 
         self.to(device)
         if type(X) is np.ndarray:
@@ -100,7 +100,7 @@ class DeepWide(nn.Module):
         return torch.sigmoid(x)
 
     def decision_function(self, X):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = get_dev()
 
         self.to(device)
         if type(X) is np.ndarray:
@@ -125,9 +125,14 @@ class DeepWide(nn.Module):
         return outputs.cpu().numpy()
 
 
+def get_dev():
+    return "cpu"
+    # return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
 class HandleDaset(Dataset):
     def __init__(self, x, y):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = get_dev()
         self.x = self.sparse_to_tensor(x).to(device)
         # self.x = torch.tensor(x,dtype=torch.float32)
         self.y = torch.tensor(y, dtype=torch.float32).to(device)
@@ -158,7 +163,7 @@ class HandleDaset(Dataset):
 
 class HandleDaset2(Dataset):
     def __init__(self, x, y):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = get_dev()
         self.x = x.tocsr()
         self.y = torch.tensor(y, dtype=torch.float32).to(device)
         self.length = self.x.shape[0]
@@ -174,7 +179,7 @@ class HandleDaset2(Dataset):
 
 class HandleDaset3(Dataset):
     def __init__(self, x, y):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = get_dev()
         self.x = self.sparse_to_tensor(scipy.sparse.csr_matrix(x))
         self.y = torch.tensor(y, dtype=torch.float32).to(self.device)
         self.length = self.x.shape[0]
@@ -218,7 +223,7 @@ class HandleDaset3(Dataset):
 
 class HandleDaset4(Dataset):
     def __init__(self, x, y, batch_size=10000):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = get_dev()
         self.x = x.tocsr()
         self.y = torch.tensor(y, dtype=torch.float32).to(self.device)
         self.length = self.x.shape[0]
@@ -288,7 +293,7 @@ def define_model(input_size, output_size, hidden_layer_sizes, bias):
 
 
 def prep_data(X, y, batch_size, shuffle=False, use_sparse=True):
-    if X.shape[1] > 1000:
+    if X.shape[1] > 5000:
         return DataLoader(HandleDaset4(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
     return DataLoader(HandleDaset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
@@ -315,7 +320,7 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
     validationloader = prep_data(X_val, y_val, batch_size=batch_size) if validation_fraction > 0 else trainloader
 
     # determine a device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = get_dev()
     print(f'The device used for training is: {device}')
 
     model.to(device)
@@ -323,14 +328,16 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
     # loss and optimizer
 
     loss_fn = nn.BCELoss()
+    if hasattr(model, "get_loss"):
+        loss_fn = model.get_loss()
     if hasattr(model, "get_optimizer"):
         optimizer = model.get_optimizer()
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay, eps=epsilon,
-                                 betas=(beta_1, beta_2))
+                                     betas=(beta_1, beta_2))
     # nn.L1Loss
     # scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[40], gamma=.1)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience // 3, factor=0.5)
+    # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience // 3, factor=0.5)
 
     # training loop
     epoch = 1
@@ -389,7 +396,7 @@ def train_model(model, X, y, lr, epochs, batch_size, weight_decay=1e-5, patience
                 Validation Loss:{val_loss / val_steps:.8f}\t \
                 Validation Steps:{val_steps}\t \
                 LR:{curr_lr}')
-        scheduler.step(val_loss)
+        # scheduler.step(val_loss)
         epoch += 1
 
     return handler

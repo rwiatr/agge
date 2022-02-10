@@ -7,6 +7,8 @@ import pandas as pd
 import os
 import torch.optim.lr_scheduler as lr_scheduler
 
+from experiment.ipinyou.onehot.model import get_dev
+
 
 class Mlp(nn.Module):
     def __init__(self, emb_dims, output_size, hidden_layers_sizes, no_of_cont=0):
@@ -48,7 +50,7 @@ class Mlp(nn.Module):
         return out
 
     def decision_function(self, X):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = get_dev()
 
         X = torch.tensor(X.values,dtype=torch.int64)
         X = X.to(device)
@@ -60,7 +62,7 @@ class Mlp(nn.Module):
 
 class _Dataset(Dataset):
     def __init__(self,x,y):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = get_dev()
         #self.x = self.sparse_to_tensor(x).to(device)
         self.x = torch.tensor(x,dtype=torch.float32).to(device)
         self.y = torch.tensor(y,dtype=torch.float32).to(device)
@@ -193,7 +195,7 @@ def train_model(model, X, lr, epochs, batch_size, patience):
     #validationloader = prep_data(X_val, y_val, batch_size=batch_size)
 
     # determine a device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = get_dev()
     print(f'The device used for training is: {device}')
     
     model = model.to(device)
