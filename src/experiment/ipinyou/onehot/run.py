@@ -51,23 +51,23 @@ if __name__ == '__main__':
     measure = ProcessMeasure()
     experiments = generate_space([
         # advertiser ids
-        # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'], 3476 ~~ problemy
+        # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'], 3476, '3386' ~~ problemy
         # smaller advertisers: ['2261', '2259', '2997']
-        ['2261', '2259', '2997'],
+        ['1458', '3358', '3476', '2259', '2261', '2821', '2997'], # '3358', '3476', '2259', '2261', '2821', '2997'
         # sample_ids
-        list(range(5)),
+        list(range(15)),
         # bins
         [150],
         # [1, 5, 10, 50, 150, 300],
         # alpha
-        [0.0001],
+        [0.0001, 0.00001],
         # lr
-        [0.001],
+        [0.001, 0.0001, 0.00001],
         # hidden
-        [(64, 64, 64, 64)],
+        [tuple(400 for _ in range(3))],
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
-        start=10)
+        start=570)
     print(experiments)
 
     sk_auc = []
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     d_mgr = DataManager()
 
     prev_bins = None
-    output = "results_deepctr_4"
+    output = "deepfm_lr_alpha_test_4"
 
     for experiment_id, (subject, sample_id, bins, alpha, lr, hidden) in experiments:
         print(f"EXPERIMENT {experiment_id}/{len(experiments) + experiments[0][0]}, data={(subject, sample_id, bins, alpha, lr, hidden)}")
@@ -132,6 +132,8 @@ if __name__ == '__main__':
             "n_iter_no_change": 5
         }
 
+        '''
+
         deep_fm.run(X={"train":model_inputs[0], "test": model_inputs[1]},
                     y={'train': y_train, 'test': y_test},
                     subject=subject + f";encoding=label;features={len(model_inputs[0])}", 
@@ -151,11 +153,43 @@ if __name__ == '__main__':
                     linear_feature_columns = linear_feature_columns_list[0], 
                     dnn_feature_columns = dnn_feature_columns_list[0],  **nn_params)
 
+
         dw.run({"train": X_train, "test": X_test},
                {"train": y_train, "test": y_test},
                subject + f";encoding=oh;features={X_train.shape[1]}",
                **nn_params)
 
+                mlp.run({"train": X_train, "test": X_test},
+                {"train": y_train, "test": y_test},
+                subject + f";encoding=oh;features={X_train.shape[1]}",
+                **nn_params)
+
+        '''
+        start = time.time()
+        print('DeepFM model evaluation has started!')
+
+        deep_fm.run(X={"train":model_inputs[0], "test": model_inputs[1]},
+                    y={'train': y_train, 'test': y_test},
+                    subject=subject + f";encoding=label;features={len(model_inputs[0])}", 
+                    linear_feature_columns = linear_feature_columns_list[0], 
+                    dnn_feature_columns = dnn_feature_columns_list[0],  **nn_params)
+
+        print(f'time elapsed: {time.time() - start}')
+        '''
+        
+        dcn.run(X={"train":model_inputs[0], "test": model_inputs[1]},
+                    y={'train': y_train, 'test': y_test},
+                    subject=subject + f";encoding=label;features={len(model_inputs[0])}", 
+                    linear_feature_columns = linear_feature_columns_list[0], 
+                    dnn_feature_columns = dnn_feature_columns_list[0],  **nn_params)
+
+
+        wdl.run(X={"train":model_inputs[0], "test": model_inputs[1]},
+                    y={'train': y_train, 'test': y_test},
+                    subject=subject + f";encoding=label;features={len(model_inputs[0])}", 
+                    linear_feature_columns = linear_feature_columns_list[0], 
+                    dnn_feature_columns = dnn_feature_columns_list[0],  **nn_params)
+        '''
 
         # print(1. / alpha / 1000000)
         # sk_learn_lr.run({"train": X_train, "test": X_test},

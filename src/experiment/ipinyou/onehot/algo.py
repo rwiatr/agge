@@ -1,3 +1,4 @@
+from re import M
 import torch
 from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import LogisticRegression
@@ -9,7 +10,7 @@ import torch.nn as nn
 
 from deepctr_torch.models import *
 from sklearn.metrics import log_loss, roc_auc_score
-
+from tensorflow import keras
 
 class AlgoRunner:
     def __init__(self, name):
@@ -118,11 +119,28 @@ class DeepFMRunner(AlgoRunner):
         super(DeepFMRunner, self).__init__("DeepFM")
 
     def algo(self, subject, X, y , linear_feature_columns, dnn_feature_columns, **properties):
+
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model = DeepFM(linear_feature_columns = linear_feature_columns, dnn_feature_columns=dnn_feature_columns, dnn_hidden_units=properties['hidden_layer_sizes'], task='binary',
-                   l2_reg_embedding=1e-5, device='cpu')
+                   l2_reg_embedding=1e-5, device=device)
+
+        optimizer = torch.optim.Adam(
+            params=model.parameters(),
+            lr=properties['learning_rate_init'],
+            betas=(properties['beta_1'], properties['beta_2']),
+            eps=properties['epsilon'],
+            weight_decay=properties['alpha'])
         
-        model.compile('adagrad', 'binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
-        history = model.fit(x=X['train'], y=y['train'], batch_size=properties['batch_size'], epochs=properties['max_iter'], verbose=0, validation_split=0)
+        model.compile(
+            optimizer=optimizer,
+             loss='binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
+
+        history = model.fit(
+            x=X['train'], 
+            y=y['train'], 
+            batch_size=properties['batch_size'], 
+            epochs=properties['max_iter'], 
+            verbose=0)
 
         
         test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)
