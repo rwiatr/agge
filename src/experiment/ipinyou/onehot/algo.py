@@ -122,7 +122,7 @@ class DeepFMRunner(AlgoRunner):
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model = DeepFM(linear_feature_columns = linear_feature_columns, dnn_feature_columns=dnn_feature_columns, dnn_hidden_units=properties['hidden_layer_sizes'], task='binary',
-                   l2_reg_embedding=1e-5, device=device)
+                   l2_reg_embedding=1e-5, device=device, dnn_dropout=0.9)
 
         optimizer = torch.optim.Adam(
             params=model.parameters(),
@@ -142,7 +142,6 @@ class DeepFMRunner(AlgoRunner):
             epochs=properties['max_iter'], 
             verbose=0)
 
-        
         test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)
         return {"test": test_auc}
 

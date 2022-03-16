@@ -23,7 +23,7 @@ class Mlp(nn.Module):
         # connect deep n wide
         self.output_layer = nn.Linear(hidden_layers_sizes[-1], output_size)
 
-        print(self)
+        #print(self)
 
     def forward(self, x):
         for net in self.embedding:

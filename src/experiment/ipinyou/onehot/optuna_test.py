@@ -28,7 +28,7 @@ from experiment.ipinyou.onehot.model import Mlp
 
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-#DEVICE = torch.device('cpu')
+DEVICE = torch.device('cpu')
 BATCHSIZE = 128
 CLASSES = 10
 DIR = os.getcwd()
@@ -39,46 +39,17 @@ N_VALID_EXAMPLES = BATCHSIZE * 10
 
 VALID_FRACTION = .1
 
-
-# data
-subject = '1458'
-bins = 100
-sample_id = 1
-
-d_mgr = DataManager()
-X_TRAIN, Y_TRAIN, X_test, y_test, X_train_agge, X_test_agge, linear_feature_columns_list, dnn_feature_columns_list, model_inputs, = d_mgr.get_data(subject, bins, sample_id)
-
-# model arguments
-DATA_INPUT_SIZE = X_TRAIN.shape[1]
-DATA_OUTPUT_SIZE = 1
-
-
-def define_model(trial):
+def define_model(trial, data_input_size, data_output_size):
     # We optimize the number of layers and hidden units in each layer.
-    n_layers = trial.suggest_int("n_layers", 2, 16)
+    n_layers = trial.suggest_int("n_layers", 4, 8)
     
     layers = []
 
     for i in range(n_layers):
-        out_features =  trial.suggest_int("n_units_l{}".format(i), 4, 128)
+        out_features =  trial.suggest_int("n_units_l{}".format(i), 8, 32)
         layers.append(out_features)
     
-    return Mlp(DATA_INPUT_SIZE, DATA_OUTPUT_SIZE, layers, bias=False)
-
-def get_mnist():
-    # Load FashionMNIST dataset.
-    train_loader = torch.utils.data.DataLoader(
-        datasets.FashionMNIST(DIR, train=True, download=True, transform=transforms.ToTensor()),
-        batch_size=BATCHSIZE,
-        shuffle=True,
-    )
-    valid_loader = torch.utils.data.DataLoader(
-        datasets.FashionMNIST(DIR, train=False, transform=transforms.ToTensor()),
-        batch_size=BATCHSIZE,
-        shuffle=True,
-    )
-
-    return train_loader, valid_loader
+    return Mlp(data_input_size, data_output_size, tuple(layers), bias=False)
 
 class HandleDaset(Dataset):
     def __init__(self, x, y):
@@ -128,16 +99,14 @@ class HandleDaset(Dataset):
 
 
 def prep_data(X, y, batch_size, shuffle=False):
-
-
     return DataLoader(HandleDaset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
 
-def objective(trial):
+def objective(trial, model, x_train, y_train):
     
 
     # Generate the model.
-    model = define_model(trial).to(DEVICE)
+    model = define_model(trial, x_train.shape[1], 1).to(DEVICE)
 
     # Generate the optimizers.
     optimizer_name = trial.suggest_categorical("optimizer", ["Adam"])
@@ -212,16 +181,13 @@ def objective(trial):
 
     return accuracy
 
-
-if __name__ == "__main__":
-
+def run_optuna(x_train, y_train, model = Mlp):
     study = optuna.create_study(
         direction="minimize",
         study_name='example-study',
         storage='sqlite:///example.db',
         load_if_exists=True)
-    study.optimize(objective, n_trials=100, timeout=600)
-
+    study.optimize(lambda trial: objective(trial, model, x_train, y_train), n_trials=10, timeout=600, show_progress_bar=True)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
@@ -238,3 +204,15 @@ if __name__ == "__main__":
     print("  Params: ")
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
+
+
+if __name__ == "__main__":
+    # data
+    subject = '1458'
+    bins = 100
+    sample_id = 1
+
+    d_mgr = DataManager()
+    X_TRAIN, Y_TRAIN, X_test, y_test, X_train_agge, X_test_agge, linear_feature_columns_list, dnn_feature_columns_list, model_inputs, = d_mgr.get_data(subject, bins, sample_id)
+
+    run_optuna(X_TRAIN, Y_TRAIN)
