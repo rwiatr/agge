@@ -28,7 +28,7 @@ from experiment.ipinyou.onehot.model import Mlp
 
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-DEVICE = torch.device('cpu')
+#DEVICE = torch.device('cpu')
 BATCHSIZE = 128
 CLASSES = 10
 DIR = os.getcwd()
@@ -187,7 +187,7 @@ def run_optuna(x_train, y_train, model = Mlp):
         study_name='example-study',
         storage='sqlite:///example.db',
         load_if_exists=True)
-    study.optimize(lambda trial: objective(trial, model, x_train, y_train), n_trials=10, timeout=600, show_progress_bar=True)
+    study.optimize(lambda trial: objective(trial, model, x_train, y_train), n_trials=100, timeout=600, show_progress_bar=True)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
