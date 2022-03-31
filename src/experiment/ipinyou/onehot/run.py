@@ -53,22 +53,22 @@ if __name__ == '__main__':
         # advertiser ids
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'], 3476, '3386' ~~ problemy
         # smaller advertisers: ['2261', '2259', '2997']
-        ['1458','3476','2997'], # '3358', '3476', '2259', '2261', '2821', '2997'
+        ['1458'], # '3358', '3476', '2259', '2261', '2821', '2997'
         # '1458', '3358', '3476', '2259', '2261', '2821', '2997'
         # sample_ids
-        list(range(15)),
+        list(range(30)),
         # bins
         [150],
         # [1, 5, 10, 50, 150, 300],
         # alpha
-        [0.00001], # 0.001, 0.0001, 0.00001, 0.000001
+        [0.001], # 0.001, 0.0001, 0.00001, 0.000001
         # lr
         [0.0001],
         # hidden
-        [tuple(8 for _ in range(4)), tuple(16 for _ in range(4)), tuple(32 for _ in range(4))],
+        [tuple(64 for _ in range(4))],
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
-        start=0) #240
+        start=0) #240(alpha) #126(width), 
     print(experiments)
 
     sk_auc = []
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     d_mgr = DataManager()
 
     prev_bins = None
-    output = "deepfm_width_droput_0"
+    output = "deepfm_1458_w_vali_bis"
 
     for experiment_id, (subject, sample_id, bins, alpha, lr, hidden) in experiments:
         print(f"EXPERIMENT {experiment_id}/{len(experiments) + experiments[0][0]}, data={(subject, sample_id, bins, alpha, lr, hidden)}")

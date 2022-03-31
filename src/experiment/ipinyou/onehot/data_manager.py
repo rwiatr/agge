@@ -56,9 +56,8 @@ class DataManager:
                 'creative',  # 'bidprice', #'payprice',
                 'keypage', 'advertiser']
 
-
-        dense_features = ['weekday', 'hour', 'region',  'city', 'slotwidth', 'slotheight', 'slotprice_bucket']
-        sparse_features = [col_name for col_name in cols if col_name not in dense_features]
+        dense_features = cols
+        sparse_features = cols
 
         if self.new_sample or self.new_subject or self.new_bins:
             print('ENCODING...')
@@ -119,3 +118,5 @@ class DataManager:
             model_inputs += [{name: data[name] for name in feature_names}]
 
         return linear_feature_columns_list, dnn_feature_columns_list, model_inputs
+        
+    
