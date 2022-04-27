@@ -1,4 +1,6 @@
+from cgi import test
 from re import M
+from sklearn.utils import shuffle
 import torch
 from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import LogisticRegression
@@ -9,6 +11,7 @@ from experiment.measure import ProcessMeasure
 import torch.nn as nn
 
 from deepctr_torch.models import *
+from deepctr_torch.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.metrics import log_loss, roc_auc_score
 from tensorflow import keras
 
@@ -120,6 +123,9 @@ class DeepFMRunner(AlgoRunner):
 
     def algo(self, subject, X, y , linear_feature_columns, dnn_feature_columns, **properties):
 
+        es = EarlyStopping(monitor='val_binary_crossentropy', min_delta=0, verbose=1, patience=properties["n_iter_no_change"], mode='min')
+        mdckpt = ModelCheckpoint(filepath='model.ckpt', monitor='val_binary_crossentropy', verbose=1, save_best_only=True, mode='min')
+
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model = DeepFM(
             linear_feature_columns = linear_feature_columns,
@@ -146,13 +152,72 @@ class DeepFMRunner(AlgoRunner):
             y=y['train'], 
             batch_size=properties['batch_size'], 
             epochs=properties['max_iter'], 
-            verbose=0,
-            validation_data=(X['test'], y['test']),
-            validation_split=0.2)
+            verbose=2,
+            validation_data=(X['vali'], y['vali']),
+            shuffle=False,
+            callbacks=[es, mdckpt])
+
+        loss_arr = history.history['loss']
+        print(f'EPOCHS: {len(loss_arr)}')
+        model_best = torch.load('model.ckpt')
 
         train_auc = round(roc_auc_score(y['train'], model.predict(X['train'], properties['batch_size'])), 4)
         test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)
-        return {"train" : train_auc, "test": test_auc}
+        best_test_auc = round(roc_auc_score(y['test'], model_best.predict(X['test'], properties['batch_size'])), 4)
+        print(f"TRAIN_AUC: {train_auc}, TEST_AUC: {test_auc}, BEST_TEST_AUC: {best_test_auc} ")
+        return {"train" : train_auc, "test": test_auc, "best_test": best_test_auc, "early_stop_epoch": len(loss_arr)}
+
+class DCNRunner(AlgoRunner):
+    def __init__(self):
+        super(DCNRunner, self).__init__("dcn")
+
+    def algo(self, subject, X, y , linear_feature_columns, dnn_feature_columns, **properties):
+
+        es = EarlyStopping(monitor='val_binary_crossentropy', min_delta=0, verbose=1, patience=properties["n_iter_no_change"], mode='min')
+        mdckpt = ModelCheckpoint(filepath='model.ckpt', monitor='val_binary_crossentropy', verbose=1, save_best_only=True, mode='min')
+
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        model = DCN(
+            linear_feature_columns = linear_feature_columns,
+            dnn_feature_columns=dnn_feature_columns, 
+            dnn_hidden_units=properties['hidden_layer_sizes'], 
+            task='binary',
+            l2_reg_embedding=1e-5,
+            cross_num=2, 
+            device=device, 
+            dnn_dropout=0.9)
+
+        optimizer = torch.optim.Adam(
+            params=model.parameters(),
+            lr=properties['learning_rate_init'],
+            betas=(properties['beta_1'], properties['beta_2']),
+            eps=properties['epsilon'],
+            weight_decay=properties['alpha'])
+        
+        model.compile(
+            optimizer=optimizer,
+             loss='binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
+
+        history = model.fit(
+            x=X['train'], 
+            y=y['train'], 
+            batch_size=properties['batch_size'], 
+            epochs=properties['max_iter'], 
+            verbose=2,
+            validation_data=(X['vali'], y['vali']),
+            shuffle=False,
+            callbacks=[es, mdckpt])
+
+        loss_arr = history.history['loss']
+        print(f'EPOCHS: {len(loss_arr)}')
+        model_best = torch.load('model.ckpt')
+
+        train_auc = round(roc_auc_score(y['train'], model.predict(X['train'], properties['batch_size'])), 4)
+        test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)
+        best_test_auc = round(roc_auc_score(y['test'], model_best.predict(X['test'], properties['batch_size'])), 4)
+        print(f"TRAIN_AUC: {train_auc}, TEST_AUC: {test_auc}, BEST_TEST_AUC: {best_test_auc} ")
+        return {"train" : train_auc, "test": test_auc, "best_test": best_test_auc, "early_stop_epoch": len(loss_arr)}
 
 class WDLRunner(AlgoRunner):
     def __init__(self):
@@ -161,6 +226,8 @@ class WDLRunner(AlgoRunner):
     def algo(self, subject, X, y , linear_feature_columns, dnn_feature_columns, **properties):
         model = WDL(linear_feature_columns = linear_feature_columns, dnn_feature_columns=dnn_feature_columns, dnn_hidden_units=properties['hidden_layer_sizes'], task='binary',
                    l2_reg_embedding=1e-5, device='cpu')
+
+
         
         model.compile('adagrad', 'binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
         history = model.fit(x=X['train'], y=y['train'], batch_size=properties['batch_size'], epochs=properties['max_iter'], verbose=0, validation_split=0)
@@ -169,20 +236,7 @@ class WDLRunner(AlgoRunner):
         test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)
         return {"test": test_auc}
 
-class DCNRunner(AlgoRunner):
-    def __init__(self):
-        super(DCNRunner, self).__init__("dcn")
 
-    def algo(self, subject, X, y , linear_feature_columns, dnn_feature_columns, **properties):
-        model = DCN(linear_feature_columns = linear_feature_columns, dnn_feature_columns=dnn_feature_columns, dnn_hidden_units=properties['hidden_layer_sizes'], task='binary',
-                   l2_reg_embedding=1e-5, device='cpu')
-        
-        model.compile('adagrad', 'binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
-        history = model.fit(x=X['train'], y=y['train'], batch_size=properties['batch_size'], epochs=properties['max_iter'], verbose=0, validation_split=0)
-
-        
-        test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)
-        return {"test": test_auc}
 
 def init_weights(m):
     if isinstance(m, nn.Linear):
