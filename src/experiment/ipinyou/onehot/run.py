@@ -53,17 +53,18 @@ if __name__ == '__main__':
         # advertiser ids
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'], 3476, '3386' ~~ problemy
         # smaller advertisers: ['2261', '2259', '2997']
-        ['3386'], # '3358', '3476', '2259', '2261', '2821', '2997'
+        ['1458'], # '3358', '3476', '2259', '2261', '2821', '2997'
         # '1458', '3358', '3476', '2259', '2261', '2821', '2997'
+        # '2821', '2997', '2261', '2259', ?'3476'
         # sample_ids
-        list(range(10)),
+        list(range(1)),
         # bins
         [150],
         # [1, 5, 10, 50, 150, 300],
         # alpha
         [0.001], # 0.001, 0.0001, 0.00001, 0.000001
         # lr
-        [0.000075],
+        [0.001],
         # hidden
         [tuple(64 for _ in range(4))],
     ],
@@ -92,7 +93,7 @@ if __name__ == '__main__':
     d_mgr = DataManager()
 
     prev_bins = None
-    output = "deepfm_epochs600_patience20_width64_3386"
+    output = "deepfm_epochs2000_patience2000_width64_1458_lrie5_22002"
 
     for experiment_id, (subject, sample_id, bins, alpha, lr, hidden) in experiments:
         print(f"EXPERIMENT {experiment_id}/{len(experiments) + experiments[0][0]}, data={(subject, sample_id, bins, alpha, lr, hidden)}")
@@ -113,11 +114,11 @@ if __name__ == '__main__':
             # "activation":"relu",
             # "solver":'adam',
             "alpha": alpha,  # 0.000001,
-            "batch_size": 1700,
+            "batch_size": 1500,
             # "learning_rate": "constant",
             "learning_rate_init": lr,
             # "power_t": 0.5,
-            "max_iter": 600,  # implement
+            "max_iter": 2000,  # implement
             # "shuffle": True, # always true
             "validation_fraction": 0.2,  # implement
             # "random_state":None,
@@ -130,7 +131,10 @@ if __name__ == '__main__':
             "beta_2": 0.999,
             "epsilon": 1e-8,
             # "n_iter_no_change": 10, "max_fun": 15000
-            "n_iter_no_change": 20
+            "n_iter_no_change": 25,
+            "reduce_lr_times": 4, 
+            "reduce_lr_value": 0.1,
+            "define_new_model": True
         }
 
         '''
@@ -167,15 +171,20 @@ if __name__ == '__main__':
 
         '''
         start = time.time()
-        print('dcn model evaluation has started!')
-
-        deep_fm.run(X={"train":data['X_train'], "test": data['X_test'], "vali": data['X_vali']},
-                    y={'train': data['y_train'], 'test': data['y_test'], "vali": data['y_vali']},
-                    subject=subject + f";encoding=label;features={len(data['X_train'])}", 
-                    linear_feature_columns = linear_feature_columns[0], 
-                    dnn_feature_columns = dnn_feature_columns[0],  **nn_params)
-
-        print(f'time elapsed: {time.time() - start}')
+        
+        for _ in range(nn_params["reduce_lr_times"]):
+            
+            print('dcn model evaluation has started!')
+            deep_fm.run(X={"train":data['X_train'], "test": data['X_test'], "vali": data['X_vali']},
+                        y={'train': data['y_train'], 'test': data['y_test'], "vali": data['y_vali']},
+                        subject=subject + f";encoding=label;features={len(data['X_train'])}", 
+                        linear_feature_columns = linear_feature_columns[0], 
+                        dnn_feature_columns = dnn_feature_columns[0], **nn_params)
+            
+            nn_params['learning_rate_init'] = nn_params['learning_rate_init']*nn_params["reduce_lr_value"]
+            nn_params["define_new_model"] = False
+            print(f'time elapsed: {time.time() - start}')
+        
         '''
         
         dcn.run(X={"train":model_inputs[0], "test": model_inputs[1]},

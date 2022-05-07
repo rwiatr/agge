@@ -127,14 +127,26 @@ class DeepFMRunner(AlgoRunner):
         mdckpt = ModelCheckpoint(filepath='model.ckpt', monitor='val_binary_crossentropy', verbose=1, save_best_only=True, mode='min')
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = DeepFM(
-            linear_feature_columns = linear_feature_columns,
-            dnn_feature_columns=dnn_feature_columns, 
-            dnn_hidden_units=properties['hidden_layer_sizes'], 
-            task='binary',
-            l2_reg_embedding=1e-5, 
-            device=device, 
-            dnn_dropout=0.9)
+
+        if properties['define_new_model']:
+            model = DeepFM(
+                linear_feature_columns = linear_feature_columns,
+                dnn_feature_columns=dnn_feature_columns, 
+                dnn_hidden_units=properties['hidden_layer_sizes'], 
+                task='binary',
+                l2_reg_embedding=1e-5, 
+                device=device, 
+                dnn_dropout=0.9)
+        else:
+            model = torch.load('model.ckpt')
+        #model = DeepFM(
+        #    linear_feature_columns = linear_feature_columns,
+        #    dnn_feature_columns=dnn_feature_columns, 
+        #    dnn_hidden_units=properties['hidden_layer_sizes'], 
+        #    task='binary',
+        #   l2_reg_embedding=1e-5, 
+        #    device=device, 
+        #   dnn_dropout=0.9)
 
         optimizer = torch.optim.Adam(
             params=model.parameters(),
@@ -145,7 +157,10 @@ class DeepFMRunner(AlgoRunner):
         
         model.compile(
             optimizer=optimizer,
-             loss='binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
+            loss='binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
+        
+        current_lr_value = properties['learning_rate_init']
+        print(f'Model evaluation for lr={current_lr_value}')
 
         history = model.fit(
             x=X['train'], 
@@ -163,9 +178,10 @@ class DeepFMRunner(AlgoRunner):
 
         train_auc = round(roc_auc_score(y['train'], model.predict(X['train'], properties['batch_size'])), 4)
         test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)
+        best_train_auc = round(roc_auc_score(y['train'], model_best.predict(X['train'], properties['batch_size'])), 4)
         best_test_auc = round(roc_auc_score(y['test'], model_best.predict(X['test'], properties['batch_size'])), 4)
         print(f"TRAIN_AUC: {train_auc}, TEST_AUC: {test_auc}, BEST_TEST_AUC: {best_test_auc} ")
-        return {"train" : train_auc, "test": test_auc, "best_test": best_test_auc, "early_stop_epoch": len(loss_arr)}
+        return {"train" : train_auc, "test": test_auc, "best_train": best_train_auc, "best_test": best_test_auc, "early_stop_epoch": len(loss_arr)}
 
 class DCNRunner(AlgoRunner):
     def __init__(self):
