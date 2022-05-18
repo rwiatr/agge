@@ -194,15 +194,18 @@ class DCNRunner(AlgoRunner):
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        model = DCN(
-            linear_feature_columns = linear_feature_columns,
-            dnn_feature_columns=dnn_feature_columns, 
-            dnn_hidden_units=properties['hidden_layer_sizes'], 
-            task='binary',
-            l2_reg_embedding=1e-5,
-            cross_num=2, 
-            device=device, 
-            dnn_dropout=0.9)
+        if properties['define_new_model']:
+            model = DCN(
+                linear_feature_columns = linear_feature_columns,
+                dnn_feature_columns=dnn_feature_columns, 
+                dnn_hidden_units=properties['hidden_layer_sizes'], 
+                task='binary',
+                l2_reg_embedding=1e-5,
+                cross_num=2, 
+                device=device, 
+                dnn_dropout=0.9)    
+        else:
+            model = torch.load('model.ckpt')
 
         optimizer = torch.optim.Adam(
             params=model.parameters(),
@@ -231,9 +234,10 @@ class DCNRunner(AlgoRunner):
 
         train_auc = round(roc_auc_score(y['train'], model.predict(X['train'], properties['batch_size'])), 4)
         test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)
+        best_train_auc = round(roc_auc_score(y['train'], model_best.predict(X['train'], properties['batch_size'])), 4)
         best_test_auc = round(roc_auc_score(y['test'], model_best.predict(X['test'], properties['batch_size'])), 4)
         print(f"TRAIN_AUC: {train_auc}, TEST_AUC: {test_auc}, BEST_TEST_AUC: {best_test_auc} ")
-        return {"train" : train_auc, "test": test_auc, "best_test": best_test_auc, "early_stop_epoch": len(loss_arr)}
+        return {"train" : train_auc, "test": test_auc, "best_train": best_train_auc, "best_test": best_test_auc, "early_stop_epoch": len(loss_arr)}
 
 class WDLRunner(AlgoRunner):
     def __init__(self):

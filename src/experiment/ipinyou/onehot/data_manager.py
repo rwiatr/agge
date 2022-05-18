@@ -156,8 +156,8 @@ class DataManager:
                 self._df_test = neg_sample(self.df_test, 0.2)
                 self._df_train = neg_sample(self.df_train, 0.2)
             else:
-                self._df_test = neg_sample(self.df_test, 0.3)
-                self._df_train = neg_sample(self.df_train, 0.3)
+                self._df_test = neg_sample(self.df_test, 0.2)
+                self._df_train = neg_sample(self.df_train, 0.2)
 
         cols_int = ['click', 'weekday', 'hour', 'timestamp', 'logtype', 'region', 'region', 'slotwidth', 'slotheight', 'slotheight', 'bidprice', 'payprice', 'payprice', 'event', 'slotprice_bucket']
 
