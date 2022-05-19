@@ -93,7 +93,7 @@ if __name__ == '__main__':
     d_mgr = DataManager()
 
     prev_bins = None
-    output = "dcn_epochs2000_patience15_width124_1458_adaptivelr_morepatienceinlast"
+    output = "mypc_time_measure"
 
     for experiment_id, (subject, sample_id, bins, alpha, lr, hidden) in experiments:
         print(f"EXPERIMENT {experiment_id}/{len(experiments) + experiments[0][0]}, data={(subject, sample_id, bins, alpha, lr, hidden)}")
@@ -118,7 +118,7 @@ if __name__ == '__main__':
             # "learning_rate": "constant",
             "learning_rate_init": lr,
             # "power_t": 0.5,
-            "max_iter": 3000,  # implement
+            "max_iter": 500,  # implement
             # "shuffle": True, # always true
             "validation_fraction": 0.2,  # implement
             # "random_state":None,
@@ -131,8 +131,8 @@ if __name__ == '__main__':
             "beta_2": 0.999,
             "epsilon": 1e-8,
             # "n_iter_no_change": 10, "max_fun": 15000
-            "n_iter_no_change": 15,
-            "reduce_lr_times": 4, 
+            "n_iter_no_change": 500,
+            "reduce_lr_times": 1, 
             "reduce_lr_value": 0.1,
             "define_new_model": True
         }
