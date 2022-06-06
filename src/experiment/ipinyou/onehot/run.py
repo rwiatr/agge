@@ -53,11 +53,11 @@ if __name__ == '__main__':
         # advertiser ids
         # ['1458', '3358', '3386', '3427', '3476', '2259', '2261', '2821', '2997'], 3476, '3386' ~~ problemy
         # smaller advertisers: ['2261', '2259', '2997']
-        ['1458'], # '3358', '3476', '2259', '2261', '2821', '2997'
+        ['2261'], # '3358', '3476', '2259', '2261', '2821', '2997'
         # '1458', '3358', '3476', '2259', '2261', '2821', '2997'
         # '2821', '2997', '2261', '2259', ?'3476'
         # sample_ids
-        list(range(10)),
+        list(range(5)),
         # bins
         [150],
         # [1, 5, 10, 50, 150, 300],
@@ -66,7 +66,11 @@ if __name__ == '__main__':
         # lr
         [0.001],
         # hidden
-        [tuple(124 for _ in range(4))],
+        [tuple(256 for _ in range(4))],
+        # dnn dropout
+        [0.9],
+        # l2_ref
+        [0.00001]
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
         start=0) #240(alpha) #126(width), 
@@ -93,10 +97,10 @@ if __name__ == '__main__':
     d_mgr = DataManager()
 
     prev_bins = None
-    output = "mypc_time_measure"
+    output = "deepfm_width256_adv22592261_adaptivelr"
 
-    for experiment_id, (subject, sample_id, bins, alpha, lr, hidden) in experiments:
-        print(f"EXPERIMENT {experiment_id}/{len(experiments) + experiments[0][0]}, data={(subject, sample_id, bins, alpha, lr, hidden)}")
+    for experiment_id, (subject, sample_id, bins, alpha, lr, hidden, dnn_dropout,l2_reg) in experiments:
+        print(f"EXPERIMENT {experiment_id}/{len(experiments) + experiments[0][0]}, data={(subject, sample_id, bins, alpha, lr, hidden, dnn_dropout, l2_reg)}")
         #X_train, y_train, X_test, y_test, X_train_agge, X_test_agge, linear_feature_columns_list, dnn_feature_columns_list, model_inputs, = d_mgr.get_data(subject, bins, sample_id)
         #linear_feature_columns_list, dnn_feature_columns_list, model_inputs, df_train, df_test, y_train, y_test = d_mgr.get_sparse_dense_data(subject, bins, sample_id)
         data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, sample_id)
@@ -118,7 +122,7 @@ if __name__ == '__main__':
             # "learning_rate": "constant",
             "learning_rate_init": lr,
             # "power_t": 0.5,
-            "max_iter": 500,  # implement
+            "max_iter": 2000,  # implement
             # "shuffle": True, # always true
             "validation_fraction": 0.2,  # implement
             # "random_state":None,
@@ -131,8 +135,10 @@ if __name__ == '__main__':
             "beta_2": 0.999,
             "epsilon": 1e-8,
             # "n_iter_no_change": 10, "max_fun": 15000
-            "n_iter_no_change": 500,
-            "reduce_lr_times": 1, 
+            "n_iter_no_change": 15,
+            'dnn_dropout': dnn_dropout,
+            "l2_reg": l2_reg,
+            "reduce_lr_times": 4, 
             "reduce_lr_value": 0.1,
             "define_new_model": True
         }
@@ -175,7 +181,7 @@ if __name__ == '__main__':
         for _ in range(nn_params["reduce_lr_times"]):
             
             print('dcn model evaluation has started!')
-            dcn.run(X={"train":data['X_train'], "test": data['X_test'], "vali": data['X_vali']},
+            deep_fm.run(X={"train":data['X_train'], "test": data['X_test'], "vali": data['X_vali']},
                         y={'train': data['y_train'], 'test': data['y_test'], "vali": data['y_vali']},
                         subject=subject + f";encoding=label;features={len(data['X_train'])}", 
                         linear_feature_columns = linear_feature_columns[0], 

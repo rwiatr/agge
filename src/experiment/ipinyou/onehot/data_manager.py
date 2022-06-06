@@ -156,8 +156,8 @@ class DataManager:
                 self._df_test = neg_sample(self.df_test, 0.2)
                 self._df_train = neg_sample(self.df_train, 0.2)
             else:
-                self._df_test = neg_sample(self.df_test, 0.2)
-                self._df_train = neg_sample(self.df_train, 0.2)
+                self._df_test = neg_sample(self.df_test, 0.3)
+                self._df_train = neg_sample(self.df_train, 0.3)
 
         cols_int = ['click', 'weekday', 'hour', 'timestamp', 'logtype', 'region', 'region', 'slotwidth', 'slotheight', 'slotheight', 'bidprice', 'payprice', 'payprice', 'event', 'slotprice_bucket']
 
@@ -198,6 +198,7 @@ class DataManager:
         X_test, y_test = self._df_test[self._df_test.columns[self._df_test.columns!='click']], self._df_test.click.to_numpy().astype('float64')
         
         X_train, X_vali, y_train, y_vali = train_test_split(X, y, test_size=0.15, random_state=2020, stratify=y)
+        X_train, y_train = fix_train_click_distribution(X_train, y_train)
 
         print(f'TRAIN CLICKS: {np.sum(y_train==1)}/{np.sum(y_train==1)+np.sum(y_train==0)}')
         print(f'VALI CLICKS: {np.sum(y_vali==1)}/{np.sum(y_vali==1)+np.sum(y_vali==0)}')
@@ -217,5 +218,12 @@ class DataManager:
 
         return data, dnn_feature_columns_list, linear_feature_columns_list
 
-        
+def fix_train_click_distribution(df, y):
+    df['click'] = y
+    trues_df = df[df.click == 1]
+    nopes_df = df[df.click == 0]
+    nth_row = int(nopes_df.shape[0]/trues_df.shape[0]) + 1
+    nopes_df[::nth_row] = trues_df
+
+    return nopes_df[nopes_df.columns[nopes_df.columns!='click']], nopes_df.click.to_numpy().astype('float64')
     

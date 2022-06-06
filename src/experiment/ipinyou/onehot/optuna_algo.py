@@ -33,18 +33,17 @@ N_TRAIN_EXAMPLES = BATCHSIZE * 30
 N_VALID_EXAMPLES = BATCHSIZE * 10
 
 VALID_FRACTION = .1
+command_line_id = sys.argv[1]
+
 
 def define_model(trial, linear_feature_columns, dnn_feature_columns):
     # We optimize the number of layers and hidden units in each layer.
-    n_layers = trial.suggest_int("n_layers", 3, 6)
-    
-    layers = []
+    n_layers = trial.suggest_int("n_layers", 3, 10)
+    out_features =  trial.suggest_int("n_units_l", 128, 1024)
 
-    for i in range(n_layers):
-        out_features =  trial.suggest_int("n_units_l{}".format(i), 32, 128)
-        layers.append(out_features)
+    layers = [out_features for _ in range(n_layers)]
 
-    dropout = trial.suggest_float("dropout", 0.7, 0.9, log=True)
+    dropout = trial.suggest_float("dropout", 0.1, 0.9, log=True)
     l2 = trial.suggest_float("l2", 1e-6, 1e-4, log=True)
     
     return DeepFM(
@@ -109,32 +108,38 @@ def prep_data(X, y, batch_size, shuffle=False):
 
 def objective(trial, data, linear_feature_columns, dnn_feature_columns):
     
-
-    # Generate the model.
-    model = define_model(trial, linear_feature_columns, dnn_feature_columns).to(DEVICE)
+    mdckpt = ModelCheckpoint(filepath=f'./models_optuna/model_cmd{command_line_id}.ckpt', monitor='val_binary_crossentropy', verbose=1, save_best_only=True, mode='min')
     es = EarlyStopping(monitor='val_binary_crossentropy', min_delta=0, verbose=1, patience=20, mode='min')
-
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Generate the optimizers.
     optimizer_name = trial.suggest_categorical("optimizer", ["Adam"])
-    lr = trial.suggest_float("lr", 1e-6, 1e-4, log=True)
+    #lr = trial.suggest_float("lr", 1e-6, 1e-4, log=True)
     alpha = trial.suggest_float("alpha", 1e-4, 1e-1, log=True)
-    optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr, weight_decay=alpha)
+    lr = 0.01
+    for i in range(4):
+        if i == 0:
+            # Generate the model.
+            model = define_model(trial, linear_feature_columns, dnn_feature_columns).to(device)
+        else:
+            model = torch.load(f'./models_optuna/model_cmd{command_line_id}.ckpt')
 
+        optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr, weight_decay=alpha)
+        model.compile(optimizer=optimizer,
+                loss='binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
 
-    model.compile(optimizer=optimizer,
-             loss='binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
+        model.fit(
+                x=data['X_train'], 
+                y=data['y_train'], 
+                batch_size=1500, 
+                epochs=2000, 
+                verbose=0,
+                validation_data=(data['X_vali'], data['y_vali']),
+                shuffle=False,
+                callbacks=[es, mdckpt])
 
-    model.fit(
-            x=data['X_train'], 
-            y=data['y_train'], 
-            batch_size=1500, 
-            epochs=600, 
-            verbose=0,
-            validation_data=(data['X_vali'], data['y_vali']),
-            shuffle=False,
-            callbacks=[es])
-
-    auc = round(roc_auc_score(data['y_test'], model.predict(data['X_test'], 256)), 4)
+        
+        model_best = torch.load(f'./models_optuna/model_cmd{command_line_id}.ckpt')
+        auc = round(roc_auc_score(data['y_test'], model_best.predict(data['X_test'], 256)), 4)
     #trial.report(auc)
 
     return auc
@@ -142,10 +147,10 @@ def objective(trial, data, linear_feature_columns, dnn_feature_columns):
 def run_optuna(data, linear_feature_columns, dnn_feature_columns):
     study = optuna.create_study(
         direction="maximize",
-        study_name='deepfm_1458',
+        study_name='deepfm_2261_060622',
         storage='sqlite:///example.db',
         load_if_exists=True)
-    study.optimize(lambda trial: objective(trial, data, linear_feature_columns, dnn_feature_columns), n_trials=100, timeout=600, show_progress_bar=True)
+    study.optimize(lambda trial: objective(trial, data, linear_feature_columns, dnn_feature_columns), n_trials=1000, timeout=600, show_progress_bar=True)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
@@ -166,11 +171,15 @@ def run_optuna(data, linear_feature_columns, dnn_feature_columns):
 
 if __name__ == "__main__":
     # data
-    subject = '1458'
+    subject = '2261'
     bins = 100
     sample_id = 1
+    
+
 
     d_mgr = DataManager()
-    data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, sample_id)
 
+
+    print(f'PROCESS WORKING ON CMD IF {command_line_id}')
+    data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, sample_id)
     run_optuna(data, linear_feature_columns, dnn_feature_columns)

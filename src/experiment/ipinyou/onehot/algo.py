@@ -134,9 +134,9 @@ class DeepFMRunner(AlgoRunner):
                 dnn_feature_columns=dnn_feature_columns, 
                 dnn_hidden_units=properties['hidden_layer_sizes'], 
                 task='binary',
-                l2_reg_embedding=1e-5, 
+                l2_reg_embedding=properties['l2_reg'], 
                 device=device, 
-                dnn_dropout=0.9)
+                dnn_dropout=properties['dnn_dropout'])
         else:
             model = torch.load('model.ckpt')
         #model = DeepFM(
