@@ -182,8 +182,9 @@ def run_optuna(data, linear_feature_columns, dnn_feature_columns, id):
         print("    {}: {}".format(key, value))
 
     params_dict = dict(trial.params.items())
+    print(f'EXPERIMENT RUN FOR {total_time} s')
     params_dict['delta'] = total_time
-    pd.DataFrame.from_dict(params_dict).to_csv(f'./optuna_data/results_thread{i}.csv')
+    pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/results_thread{i}.csv')
 
 if __name__ == "__main__":
     # data
