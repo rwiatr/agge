@@ -3,6 +3,9 @@ from re import sub
 import sys
 sys.path.append(os.getcwd())
 
+import threading
+import copy
+
 from experiment.ipinyou.onehot.data_manager import DataManager
 from experiment.ipinyou.onehot.algo import WDLRunner, DCNRunner, DeepFMRunner, SKLearnMLPRunner, SKLearnLRRunner, MLPRunner, DeepWideRunner
 from experiment.measure import ProcessMeasure
@@ -47,6 +50,29 @@ def neg_sample(df, ratio):
     return pd.concat([clicks, not_clicks.sample(int(df.shape[0] * ratio))], ignore_index=True)
 
 
+def teach_and_eval_model(data, linear_feature_columns, dnn_feature_columns, model, subject, id, nn_params):
+    start = time.time()
+    print(f'{id}: deep_fm, subject-{subject} model {id} evaluation has started!')
+    params_copy = copy.deepcopy(nn_params)
+
+    print(params_copy)
+            
+    for _ in range(params_copy["reduce_lr_times"]):
+                
+        
+        model.run(X={"train":data['X_train'], "test": data['X_test'], "vali": data['X_vali']},
+                            y={'train': data['y_train'], 'test': data['y_test'], "vali": data['y_vali']},
+                            subject=str(subject) + f";encoding=label;features={len(data['X_train'])}", 
+                            linear_feature_columns = linear_feature_columns[0], 
+                            dnn_feature_columns = dnn_feature_columns[0], id=id, **params_copy)
+                
+        params_copy['learning_rate_init'] = params_copy['learning_rate_init']*params_copy["reduce_lr_value"]
+        params_copy["define_new_model"] = False
+        if _ == 2:
+            params_copy["n_iter_no_change"] = 50
+            
+    print(f'{id}: time elapsed: {time.time() - start}')
+
 if __name__ == '__main__':
     measure = ProcessMeasure()
     experiments = generate_space([
@@ -57,7 +83,7 @@ if __name__ == '__main__':
         # '1458', '3358', '3476', '2259', '2261', '2821', '2997'
         # '2821', '2997', '2261', '2259', ?'3476'
         # sample_ids
-        list(range(30)),
+        list(range(1)),
         # bins
         [150],
         # [1, 5, 10, 50, 150, 300],
@@ -97,7 +123,7 @@ if __name__ == '__main__':
     d_mgr = DataManager()
 
     prev_bins = None
-    output = "deepfm_width256_adv2259_adaptivelr"
+    output = "deepfm_multithreading_test"
 
     for experiment_id, (subject, sample_id, bins, alpha, lr, hidden, dnn_dropout,l2_reg) in experiments:
         print(f"EXPERIMENT {experiment_id}/{len(experiments) + experiments[0][0]}, data={(subject, sample_id, bins, alpha, lr, hidden, dnn_dropout, l2_reg)}")
@@ -142,6 +168,21 @@ if __name__ == '__main__':
             "reduce_lr_value": 0.1,
             "define_new_model": True
         }
+        thread_list = []
+        for i in range(int(sys.argv[1])):
+            try:
+                thread_list += [threading.Thread(target=teach_and_eval_model, args=(data, linear_feature_columns, dnn_feature_columns, deep_fm, i, i, nn_params))]
+            except:
+                print(f'unable to create thread {i}')
+
+        for id, thread in enumerate(thread_list):
+            try:
+                thread.start()
+            except:
+                print(f'unable to start thread {id}')
+        
+        for thread_entity in thread_list:
+            thread_entity.join()
 
         '''
 
@@ -176,7 +217,8 @@ if __name__ == '__main__':
                 **nn_params)
 
         '''
-        start = time.time()
+        '''
+                start = time.time()
         
         for _ in range(nn_params["reduce_lr_times"]):
             
@@ -193,6 +235,10 @@ if __name__ == '__main__':
                 nn_params["n_iter_no_change"] = 50
         
         print(f'time elapsed: {time.time() - start}')
+        
+        
+        '''
+
         
         '''
         

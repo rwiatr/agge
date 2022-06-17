@@ -121,10 +121,10 @@ class DeepFMRunner(AlgoRunner):
     def __init__(self):
         super(DeepFMRunner, self).__init__("DeepFM")
 
-    def algo(self, subject, X, y , linear_feature_columns, dnn_feature_columns, **properties):
+    def algo(self, subject, X, y , linear_feature_columns, dnn_feature_columns, id, **properties):
 
         es = EarlyStopping(monitor='val_binary_crossentropy', min_delta=0, verbose=1, patience=properties["n_iter_no_change"], mode='min')
-        mdckpt = ModelCheckpoint(filepath='model.ckpt', monitor='val_binary_crossentropy', verbose=1, save_best_only=True, mode='min')
+        mdckpt = ModelCheckpoint(filepath=f'./models/model_id{id}.ckpt', monitor='val_binary_crossentropy', verbose=1, save_best_only=True, mode='min')
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -138,7 +138,7 @@ class DeepFMRunner(AlgoRunner):
                 device=device, 
                 dnn_dropout=properties['dnn_dropout'])
         else:
-            model = torch.load('model.ckpt')
+            model = torch.load(f'./models/model_id{id}.ckpt')
         #model = DeepFM(
         #    linear_feature_columns = linear_feature_columns,
         #    dnn_feature_columns=dnn_feature_columns, 
@@ -174,7 +174,7 @@ class DeepFMRunner(AlgoRunner):
 
         loss_arr = history.history['loss']
         print(f'EPOCHS: {len(loss_arr)}')
-        model_best = torch.load('model.ckpt')
+        model_best = torch.load(f'./models/model_id{id}.ckpt')
 
         train_auc = round(roc_auc_score(y['train'], model.predict(X['train'], properties['batch_size'])), 4)
         test_auc = round(roc_auc_score(y['test'], model.predict(X['test'], properties['batch_size'])), 4)

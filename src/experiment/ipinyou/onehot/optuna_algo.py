@@ -1,7 +1,7 @@
 import os
 import sys
 sys.path.append(os.getcwd())
-
+import threading
 
 import optuna
 from optuna.trial import TrialState
@@ -20,6 +20,8 @@ from experiment.ipinyou.onehot.model import Mlp
 from deepctr_torch.models import *
 from deepctr_torch.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.metrics import log_loss, roc_auc_score
+import time
+import pandas as pd
 
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -34,6 +36,14 @@ N_VALID_EXAMPLES = BATCHSIZE * 10
 
 VALID_FRACTION = .1
 command_line_id = sys.argv[1]
+
+def create_directiories(dirs = ['./optuna_data', './models_optuna']):
+    for dir in dirs:
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+            print(f'directory {dir} has been created')
+        else:
+            print(f'directory {dir} already exists')
 
 
 def define_model(trial, linear_feature_columns, dnn_feature_columns):
@@ -106,9 +116,9 @@ def prep_data(X, y, batch_size, shuffle=False):
     return DataLoader(HandleDaset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
 
-def objective(trial, data, linear_feature_columns, dnn_feature_columns):
+def objective(trial, data, linear_feature_columns, dnn_feature_columns, id):
     
-    mdckpt = ModelCheckpoint(filepath=f'./models_optuna/model_cmd{command_line_id}.ckpt', monitor='val_binary_crossentropy', verbose=1, save_best_only=True, mode='min')
+    mdckpt = ModelCheckpoint(filepath=f'./models_optuna/model_cmd{id}.ckpt', monitor='val_binary_crossentropy', verbose=1, save_best_only=True, mode='min')
     es = EarlyStopping(monitor='val_binary_crossentropy', min_delta=0, verbose=1, patience=20, mode='min')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Generate the optimizers.
@@ -121,7 +131,7 @@ def objective(trial, data, linear_feature_columns, dnn_feature_columns):
             # Generate the model.
             model = define_model(trial, linear_feature_columns, dnn_feature_columns).to(device)
         else:
-            model = torch.load(f'./models_optuna/model_cmd{command_line_id}.ckpt')
+            model = torch.load(f'./models_optuna/model_cmd{id}.ckpt')
 
         optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr, weight_decay=alpha)
         model.compile(optimizer=optimizer,
@@ -138,22 +148,25 @@ def objective(trial, data, linear_feature_columns, dnn_feature_columns):
                 callbacks=[es, mdckpt])
 
         
-        model_best = torch.load(f'./models_optuna/model_cmd{command_line_id}.ckpt')
+        model_best = torch.load(f'./models_optuna/model_cmd{id}.ckpt')
         auc = round(roc_auc_score(data['y_test'], model_best.predict(data['X_test'], 256)), 4)
+        lr = lr * 0.1
     #trial.report(auc)
 
     return auc
 
-def run_optuna(data, linear_feature_columns, dnn_feature_columns):
+def run_optuna(data, linear_feature_columns, dnn_feature_columns, id):
     study = optuna.create_study(
         direction="maximize",
-        study_name='deepfm_2261_060622',
+        study_name='deepfm_2261_170622',
         storage='sqlite:///example.db',
         load_if_exists=True)
-    study.optimize(lambda trial: objective(trial, data, linear_feature_columns, dnn_feature_columns), n_trials=1000, timeout=600, show_progress_bar=True)
+    start = time.time()
+    study.optimize(lambda trial: objective(trial, data, linear_feature_columns, dnn_feature_columns, id), n_trials=1000, timeout=600, show_progress_bar=True)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
+    total_time = time.time() - start
     print("Study statistics: ")
     print("  Number of finished trials: ", len(study.trials))
     print("  Number of pruned trials: ", len(pruned_trials))
@@ -168,6 +181,9 @@ def run_optuna(data, linear_feature_columns, dnn_feature_columns):
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
 
+    params_dict = dict(trial.params.items())
+    params_dict['delta'] = total_time
+    pd.DataFrame.from_dict(params_dict).to_csv(f'./optuna_data/results_thread{i}.csv')
 
 if __name__ == "__main__":
     # data
@@ -175,11 +191,31 @@ if __name__ == "__main__":
     bins = 100
     sample_id = 1
     
-
+    create_directiories()
 
     d_mgr = DataManager()
 
 
-    print(f'PROCESS WORKING ON CMD IF {command_line_id}')
+    # GET DATA
     data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, sample_id)
-    run_optuna(data, linear_feature_columns, dnn_feature_columns)
+
+    #define threads
+    thread_list = []
+    for i in range(int(sys.argv[1])):
+        try:
+            thread_list += [threading.Thread(target=run_optuna, args=(data, linear_feature_columns, dnn_feature_columns, i))]
+        except:
+            print(f'unable to create thread {i}')
+
+    #start defined threads
+    for id, thread in enumerate(thread_list):
+        try:
+            thread.start()
+        except:
+            print('unable to start thread {id}')
+    
+    for thread_entity in thread_list:
+        thread_entity.join()
+
+    print('EVERYTHING HAS FINISHED')
+    #run_optuna(data, linear_feature_columns, dnn_feature_columns)
