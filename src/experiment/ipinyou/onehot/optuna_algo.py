@@ -37,7 +37,7 @@ N_VALID_EXAMPLES = BATCHSIZE * 10
 VALID_FRACTION = .1
 command_line_id = sys.argv[1]
 
-def create_directiories(dirs = ['./optuna_data', './models_optuna']):
+def create_directiories(dirs = [f'./optuna_data/threads_{sys.argv[1]}', './models_optuna']):
     for dir in dirs:
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -155,14 +155,14 @@ def objective(trial, data, linear_feature_columns, dnn_feature_columns, id):
 
     return auc
 
-def run_optuna(data, linear_feature_columns, dnn_feature_columns, id):
+def run_optuna(data, linear_feature_columns, dnn_feature_columns, id, study_name):
     study = optuna.create_study(
         direction="maximize",
-        study_name='deepfm_2261_180622',
+        study_name=study_name,
         storage='sqlite:///deepfm_study.db',
         load_if_exists=True)
     start = time.time()
-    study.optimize(lambda trial: objective(trial, data, linear_feature_columns, dnn_feature_columns, id), n_trials=1000, timeout=600, show_progress_bar=True)
+    study.optimize(lambda trial: objective(trial, data, linear_feature_columns, dnn_feature_columns, id), n_trials=8, timeout=None, show_progress_bar=True)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
@@ -184,7 +184,11 @@ def run_optuna(data, linear_feature_columns, dnn_feature_columns, id):
     params_dict = dict(trial.params.items())
     print(f'EXPERIMENT RUN FOR {total_time} s')
     params_dict['delta'] = total_time
-    pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/results_thread{id}.csv')
+    params_dict['study_name'] = study_name
+    params_dict['value'] = trial.value
+    params_dict['finished_trials'] = len(study.trials)
+    params_dict['complete_trials'] = len(complete_trials)
+    pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/threads_{sys.argv[1]}/study_{study_name}_thread{id}.csv')
 
 if __name__ == "__main__":
     # data
@@ -196,13 +200,14 @@ if __name__ == "__main__":
 
     d_mgr = DataManager()
 
+    study_name = f'deepfm_{subject}_{str(int(time.time()))}_{sys.argv[1]}threads_study'
 
     # GET DATA
     data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, sample_id)
 
     main_study = optuna.create_study(
         direction="maximize",
-        study_name='deepfm_2261_180622_2',
+        study_name=study_name,
         storage='sqlite:///deepfm_study.db',
         load_if_exists=False)
 
@@ -210,7 +215,7 @@ if __name__ == "__main__":
     thread_list = []
     for i in range(int(sys.argv[1])):
         try:
-            thread_list += [threading.Thread(target=run_optuna, args=(data, linear_feature_columns, dnn_feature_columns, i))]
+            thread_list += [threading.Thread(target=run_optuna, args=(data, linear_feature_columns, dnn_feature_columns, i, study_name))]
         except:
             print(f'unable to create thread {i}')
 
