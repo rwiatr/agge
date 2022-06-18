@@ -8,7 +8,7 @@ from experiment.ipinyou.onehot.data_manager import DataManager
 def run_optuna(data, l, d, i):
     for x in range(4):
         time.sleep(1)
-        
+        print(f'LEN:    {len(data)}')
         print(f'thread {i}: process uses {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2} MB of memory')
 
 if __name__ == "__main__":

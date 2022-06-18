@@ -158,8 +158,8 @@ def objective(trial, data, linear_feature_columns, dnn_feature_columns, id):
 def run_optuna(data, linear_feature_columns, dnn_feature_columns, id):
     study = optuna.create_study(
         direction="maximize",
-        study_name='deepfm_2261_170622',
-        storage='sqlite:///example.db',
+        study_name='deepfm_2261_180622',
+        storage='sqlite:///deepfm_study.db',
         load_if_exists=True)
     start = time.time()
     study.optimize(lambda trial: objective(trial, data, linear_feature_columns, dnn_feature_columns, id), n_trials=1000, timeout=600, show_progress_bar=True)
@@ -184,7 +184,7 @@ def run_optuna(data, linear_feature_columns, dnn_feature_columns, id):
     params_dict = dict(trial.params.items())
     print(f'EXPERIMENT RUN FOR {total_time} s')
     params_dict['delta'] = total_time
-    pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/results_thread{i}.csv')
+    pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/results_thread{id}.csv')
 
 if __name__ == "__main__":
     # data
@@ -199,6 +199,12 @@ if __name__ == "__main__":
 
     # GET DATA
     data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, sample_id)
+
+    main_study = optuna.create_study(
+        direction="maximize",
+        study_name='deepfm_2261_180622_2',
+        storage='sqlite:///deepfm_study.db',
+        load_if_exists=False)
 
     #define threads
     thread_list = []
