@@ -8,6 +8,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from deepctr_torch.inputs import SparseFeat, DenseFeat, get_feature_names
 from sklearn.model_selection import train_test_split
 import numpy as np
+from math import ceil, floor
 
 
 class DataManager:

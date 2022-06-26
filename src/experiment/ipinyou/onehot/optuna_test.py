@@ -146,7 +146,7 @@ def objective(trial, model, x_train, y_train):
             #if batch_idx * BATCHSIZE >= N_TRAIN_EXAMPLES:
             #    break
 
-            #data, target = data.view(data.size(0), -1).to(DEVICE), target.to(DEVICE)
+        #data, target = data.view(data.size(0), -1).to(DEVICE), target.to(DEVICE)
 
             optimizer.zero_grad()
             output = model(data)
