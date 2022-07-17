@@ -223,8 +223,13 @@ def fix_train_click_distribution(df, y):
     df['click'] = y
     trues_df = df[df.click == 1]
     nopes_df = df[df.click == 0]
-    nth_row = int(nopes_df.shape[0]/trues_df.shape[0]) + 1
-    nopes_df[::nth_row] = trues_df
+    print(trues_df.shape)
+    print(nopes_df.shape)
+    nth_row = int(ceil(nopes_df.shape[0]/trues_df.shape[0])) +1
+    print(nth_row)
+    print(nopes_df[::nth_row].shape)
+    diff = nopes_df[::nth_row].shape[0] - trues_df.shape[0] 
+    nopes_df[::nth_row] = trues_df[-diff:]
 
     return nopes_df[nopes_df.columns[nopes_df.columns!='click']], nopes_df.click.to_numpy().astype('float64')
     

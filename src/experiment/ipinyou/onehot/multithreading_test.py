@@ -103,7 +103,7 @@ def run_learning_thread(data, l, d, i, nn_params):
     total_time = time.time() - start
     print(f'time elapsed: {total_time}')
     save_data['delta'] = total_time
-    pd.DataFrame.from_dict(save_data.items()).to_csv(f'./mt_data/threads_{sys.argv[1]}/thread{id}.csv')
+    pd.DataFrame.from_dict(save_data.items()).to_csv(f'./mt_data/threads_{sys.argv[1]}/{time.time()}_thread{id}.csv')
     
 if __name__ == "__main__":
     create_directiories()

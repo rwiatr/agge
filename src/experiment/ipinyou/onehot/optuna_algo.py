@@ -162,7 +162,7 @@ def run_optuna(data, linear_feature_columns, dnn_feature_columns, id, study_name
         storage='sqlite:///deepfm_study.db',
         load_if_exists=True)
     start = time.time()
-    study.optimize(lambda trial: objective(trial, data, linear_feature_columns, dnn_feature_columns, id), n_trials=8, timeout=None, show_progress_bar=True)
+    study.optimize(lambda trial: objective(trial, data, linear_feature_columns, dnn_feature_columns, id), n_trials=5, timeout=None, show_progress_bar=False)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
@@ -188,11 +188,11 @@ def run_optuna(data, linear_feature_columns, dnn_feature_columns, id, study_name
     params_dict['value'] = trial.value
     params_dict['finished_trials'] = len(study.trials)
     params_dict['complete_trials'] = len(complete_trials)
-    pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/threads_{sys.argv[1]}/study_{study_name}_thread{id}.csv')
+    pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/threads_{sys.argv[1]}/study_{study_name}_{time.time()}_thread{id}.csv')
 
 if __name__ == "__main__":
     # data
-    subject = '2261'
+    subject = '3358'
     bins = 100
     sample_id = 1
     
@@ -211,6 +211,8 @@ if __name__ == "__main__":
         storage='sqlite:///deepfm_study.db',
         load_if_exists=False)
 
+    start = time.time()
+
     #define threads
     thread_list = []
     for i in range(int(sys.argv[1])):
@@ -228,6 +230,11 @@ if __name__ == "__main__":
     
     for thread_entity in thread_list:
         thread_entity.join()
+
+    finish = time.time() - start
+    print(finish)
+    pd.DataFrame(finish).to_csv(f'{study_name}_threads{int(sys.argv[1])}_{time.time()}')
+
 
     print('EVERYTHING HAS FINISHED')
     #run_optuna(data, linear_feature_columns, dnn_feature_columns)
