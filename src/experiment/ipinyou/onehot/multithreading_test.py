@@ -112,10 +112,17 @@ if __name__ == "__main__":
     bins = 100
     sample_id = 1
     d_mgr = DataManager()
-    thread_amount = int(sys.argv[1])
+    if sys.argv[1] == None:
+        thread_amount = 1
+    else:
+        thread_amount = int(sys.argv[1])
+    
     experiment_name = f'experiment_{subject}_{time.time()}_threads{thread_amount}'
     # GET DATA
-    data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, sample_id)
+    data_list = []
+    for t in range(thread_amount):
+        data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, t)
+        data_list += [data, linear_feature_columns, dnn_feature_columns]
     
     experiments = generate_space([
         # advertiser ids
@@ -191,7 +198,7 @@ if __name__ == "__main__":
                     "dnn_dropout": dnn_dropout,
                     "l2_reg": l2_reg}
                 params = nn_params | hyperparameters
-                thread_list += [threading.Thread(target=run_learning_thread, args=(data, linear_feature_columns, dnn_feature_columns, experiment_id, params))]
+                thread_list += [threading.Thread(target=run_learning_thread, args=(data_list[i][0], data_list[i][1], data_list[i][2], experiment_id, params))]
             except:
                 print(f'unable to create thread {experiment_id}')
 

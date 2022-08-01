@@ -198,7 +198,7 @@ class DataManager:
         y = self._df_train.click.to_numpy().astype('float64')
         X_test, y_test = self._df_test[self._df_test.columns[self._df_test.columns!='click']], self._df_test.click.to_numpy().astype('float64')
         
-        X_train, X_vali, y_train, y_vali = train_test_split(X, y, test_size=0.15, random_state=2020, stratify=y)
+        X_train, X_vali, y_train, y_vali = train_test_split(X, y, test_size=0.15, stratify=y)
         X_train, y_train = fix_train_click_distribution(X_train, y_train)
 
         print(f'TRAIN CLICKS: {np.sum(y_train==1)}/{np.sum(y_train==1)+np.sum(y_train==0)}')
@@ -229,6 +229,7 @@ def fix_train_click_distribution(df, y):
     print(nth_row)
     print(nopes_df[::nth_row].shape)
     diff = nopes_df[::nth_row].shape[0] - trues_df.shape[0] 
+    print(nopes_df[::nth_row].shape, trues_df[-diff:].shape)
     nopes_df[::nth_row] = trues_df[-diff:]
 
     return nopes_df[nopes_df.columns[nopes_df.columns!='click']], nopes_df.click.to_numpy().astype('float64')

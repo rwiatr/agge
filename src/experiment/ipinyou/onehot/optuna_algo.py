@@ -155,14 +155,14 @@ def objective(trial, data, linear_feature_columns, dnn_feature_columns, id):
 
     return auc
 
-def run_optuna(data, linear_feature_columns, dnn_feature_columns, id, study_name):
+def run_optuna(data_list, id, study_name):
     study = optuna.create_study(
         direction="maximize",
         study_name=study_name,
         storage='sqlite:///deepfm_study.db',
         load_if_exists=True)
     start = time.time()
-    study.optimize(lambda trial: objective(trial, data, linear_feature_columns, dnn_feature_columns, id), n_trials=5, timeout=None, show_progress_bar=False)
+    study.optimize(lambda trial: objective(trial, data_list[trial.number%5][0], data_list[trial.number%5][1], data_list[trial.number%5][2], id), n_trials=5, timeout=None, show_progress_bar=False)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
@@ -199,11 +199,18 @@ if __name__ == "__main__":
     create_directiories()
 
     d_mgr = DataManager()
+    if sys.argv[1] == None:
+        thread_amount = 1
+    else:
+        thread_amount = int(sys.argv[1])
 
     study_name = f'deepfm_{subject}_{str(int(time.time()))}_{sys.argv[1]}threads_study'
 
     # GET DATA
-    data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, sample_id)
+    data_list = []
+    for t in range(5):
+        data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, t)
+        data_list += [[data, linear_feature_columns, dnn_feature_columns]]
 
     main_study = optuna.create_study(
         direction="maximize",
@@ -215,9 +222,9 @@ if __name__ == "__main__":
 
     #define threads
     thread_list = []
-    for i in range(int(sys.argv[1])):
+    for i in range(thread_amount):
         try:
-            thread_list += [threading.Thread(target=run_optuna, args=(data, linear_feature_columns, dnn_feature_columns, i, study_name))]
+            thread_list += [threading.Thread(target=run_optuna, args=(data_list, i, study_name))]
         except:
             print(f'unable to create thread {i}')
 
@@ -232,8 +239,9 @@ if __name__ == "__main__":
         thread_entity.join()
 
     finish = time.time() - start
+    time_dict = {'delta':finish}
     print(finish)
-    pd.DataFrame(finish).to_csv(f'{study_name}_threads{int(sys.argv[1])}_{time.time()}')
+    pd.DataFrame.from_dict(time_dict.items()).to_csv(f'./optuna_data/global/DELTA_{study_name}_threads{int(sys.argv[1])}_{time.time()}')
 
 
     print('EVERYTHING HAS FINISHED')

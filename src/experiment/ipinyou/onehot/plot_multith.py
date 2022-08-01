@@ -3,33 +3,52 @@ import numpy as np
 import pandas as pd
 import glob, os
 
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import numpy as np
+
 if __name__ == "__main__":
 
     #read global data
     data = {}
     auc_dic = {}
-    path = './mt_data/global/'
+    path = './optuna_data/global/'
+
+    global_times = [0 for x in range(9)]
     
+    # read global times
     for file in glob.glob(f'{path}*thread*'):
+        global_times[int(file.split('_')[5][0])] = pd.read_csv(file)['1'].values[0]
 
-        try:
-            threads_number = int(file[-2:])
-        except:
-            threads_number = int(file[-1])
+    auc_list = [0 for x in range(9)]
+    for file in glob.glob('./optuna_data/threads*'):
+        count = 0
+        auc = 0
+        for file_2 in glob.glob(file+'/*'):
+            
+            print(file_2.split('\\')[1][-1])
+            auc += float(pd.read_csv(file_2)['1'][8])
+            count += 1
+        auc = auc/count
+        auc_list[int(file_2.split('\\')[1][-1])] = auc
 
-        data[threads_number] = pd.read_csv(file)['1'].values[0]
+    auc_fixed = [auc_list[x] for x in [1, 2, 4, 8]]
+    global_fixed = [global_times[x] for x in [1, 2, 4, 8]]
 
-        #read local data
-        path_2 = './mt_data/'
-        sum = 0
-        counter = 0 
-        print(threads_number)
-        for experiment in glob.glob(f'{path_2}threads_{threads_number}/*thread*'):
-            data_all = pd.read_csv(experiment)
-            data_auc = float(data_all[data_all['0'] == 'BEST_TEST_AUC']['1'].values[0])
-            sum += data_auc
-            counter += 1
-        auc_dic[threads_number] = sum/counter
+    times = global_fixed
+    times = [time/times[0] for time in times]
+    delta = times
 
-    print(data)
-    print(auc_dic)
+    plt.rcParams['figure.figsize'] = (20, 5)
+    plt.plot([1, 2, 4, 8], delta, label = 'delta')
+    plt.ylabel('Wartość')
+    plt.xlabel('Liczba wątków')
+
+    plt.legend()
+    plt.show()
+
+    plt.plot([1, 2, 4, 8],auc_fixed,'g', label = 'AUC')
+    plt.ylabel('Wartość AUC')
+    plt.xlabel('Liczba wątków')
+    plt.legend()
+    plt.show()
