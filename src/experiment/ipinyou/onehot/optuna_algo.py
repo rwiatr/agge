@@ -23,21 +23,18 @@ from sklearn.metrics import log_loss, roc_auc_score
 import time
 import pandas as pd
 
+OPTIONS = {
+    'n_trials': 20,
+    'n_datasets': 5,
+    'batch_size': 1500,
+    'patience': 8,
+    'epochs': 2000,
+    'adaptive_lr_depth': 4,
+    'adaptive_lr_init': 0.01,
+    'DEVICE': torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+}
 
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-#DEVICE = torch.device('cpu')
-BATCHSIZE = 128
-CLASSES = 10
-DIR = os.getcwd()
-EPOCHS = 10
-LOG_INTERVAL = 10
-N_TRAIN_EXAMPLES = BATCHSIZE * 30
-N_VALID_EXAMPLES = BATCHSIZE * 10
-
-VALID_FRACTION = .1
-command_line_id = sys.argv[1]
-
-def create_directiories(dirs = [f'./optuna_data/threads_{sys.argv[1]}', './models_optuna']):
+def create_directiories(dirs = [f'./optuna_data/threads_{sys.argv[1]}', './models_optuna/', f'./optuna_data/global']):
     for dir in dirs:
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -62,12 +59,12 @@ def define_model(trial, linear_feature_columns, dnn_feature_columns):
             dnn_hidden_units=layers, 
             task='binary',
             l2_reg_embedding=l2, 
-            device=DEVICE, 
+            device=OPTIONS['DEVICE'], 
             dnn_dropout=dropout)
 
 class HandleDaset(Dataset):
     def __init__(self, x, y):
-        device = DEVICE
+        device = OPTIONS['DEVICE']
         self.x = self.sparse_to_tensor(x).to(device)
         # self.x = torch.tensor(x,dtype=torch.float32)
         self.y = torch.tensor(y, dtype=torch.float32).to(device)
@@ -86,7 +83,6 @@ class HandleDaset(Dataset):
         :return: a sparse torch tensor
         
         """
-
         samples = data.shape[0]
         features = data.shape[1]
         values = data.data
@@ -116,53 +112,56 @@ def prep_data(X, y, batch_size, shuffle=False):
     return DataLoader(HandleDaset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
 
-def objective(trial, data, linear_feature_columns, dnn_feature_columns, id):
-    
-    mdckpt = ModelCheckpoint(filepath=f'./models_optuna/model_cmd{id}.ckpt', monitor='val_binary_crossentropy', verbose=1, save_best_only=True, mode='min')
-    es = EarlyStopping(monitor='val_binary_crossentropy', min_delta=0, verbose=1, patience=20, mode='min')
+def objective(trial, data_list):
+    linear_feature_columns, dnn_feature_columns = data_list[0][1], data_list[0][2]
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # Generate the optimizers.
+    model = define_model(trial, linear_feature_columns, dnn_feature_columns).to(device)
+    print(device)
     optimizer_name = trial.suggest_categorical("optimizer", ["Adam"])
-    #lr = trial.suggest_float("lr", 1e-6, 1e-4, log=True)
     alpha = trial.suggest_float("alpha", 1e-4, 1e-1, log=True)
-    lr = 0.01
-    for i in range(4):
-        if i == 0:
-            # Generate the model.
-            model = define_model(trial, linear_feature_columns, dnn_feature_columns).to(device)
-        else:
-            model = torch.load(f'./models_optuna/model_cmd{id}.ckpt')
+    
+    lr = OPTIONS['adaptive_lr_init']
+    mean_auc = 0.0
 
-        optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr, weight_decay=alpha)
-        model.compile(optimizer=optimizer,
-                loss='binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
+    for (id, (data, lfc, dfc)) in enumerate(data_list):
+        mdckpt = ModelCheckpoint(filepath=f'./models_optuna/model_cmd{trial.number}_{id}.ckpt', monitor='val_binary_crossentropy', verbose=1, save_best_only=True, mode='min')
+        es = EarlyStopping(monitor='val_binary_crossentropy', min_delta=0, verbose=1, patience=OPTIONS['patience'], mode='min')
 
-        model.fit(
-                x=data['X_train'], 
-                y=data['y_train'], 
-                batch_size=1500, 
-                epochs=2000, 
-                verbose=0,
-                validation_data=(data['X_vali'], data['y_vali']),
-                shuffle=False,
-                callbacks=[es, mdckpt])
+        for i in range(OPTIONS['adaptive_lr_depth']):
+            if i != 0:
+                model = torch.load(f'./models_optuna/model_cmd{trial.number}_{id}.ckpt')
+                
+            optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr, weight_decay=alpha)
+            model.compile(optimizer=optimizer,
+                    loss='binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
 
-        
-        model_best = torch.load(f'./models_optuna/model_cmd{id}.ckpt')
-        auc = round(roc_auc_score(data['y_test'], model_best.predict(data['X_test'], 256)), 4)
-        lr = lr * 0.1
-    #trial.report(auc)
+            model.fit(
+                    x=data['X_train'], 
+                    y=data['y_train'], 
+                    batch_size=OPTIONS['batch_size'], 
+                    epochs=OPTIONS['epochs'], 
+                    verbose=0,
+                    validation_data=(data['X_vali'], data['y_vali']),
+                    shuffle=False,
+                    callbacks=[es, mdckpt])
 
-    return auc
+            model_best = torch.load(f'./models_optuna/model_cmd{trial.number}_{id}.ckpt')
+            auc = round(roc_auc_score(data['y_test'], model_best.predict(data['X_test'], 256)), 4)
+            lr = lr * 0.1
+        mean_auc += auc
+    mean_auc = mean_auc/len(data_list)
 
-def run_optuna(data_list, id, study_name):
+    return mean_auc
+
+def run_optuna(data_list, study_name, njobs):
     study = optuna.create_study(
         direction="maximize",
         study_name=study_name,
         storage='sqlite:///deepfm_study.db',
         load_if_exists=True)
-    start = time.time()
-    study.optimize(lambda trial: objective(trial, data_list[trial.number%5][0], data_list[trial.number%5][1], data_list[trial.number%5][2], id), n_trials=5, timeout=None, show_progress_bar=False)
+    
+    study.optimize(lambda trial: objective(trial, data_list), n_trials=OPTIONS['n_trials'], n_jobs=njobs, timeout=None, show_progress_bar=False)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
@@ -174,10 +173,9 @@ def run_optuna(data_list, id, study_name):
 
     print("Best trial:")
     trial = study.best_trial
-
     print("  Value: ", trial.value)
-
     print("  Params: ")
+
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
 
@@ -188,7 +186,10 @@ def run_optuna(data_list, id, study_name):
     params_dict['value'] = trial.value
     params_dict['finished_trials'] = len(study.trials)
     params_dict['complete_trials'] = len(complete_trials)
-    pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/threads_{sys.argv[1]}/study_{study_name}_{time.time()}_thread{id}.csv')
+    pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/threads_{njobs}/study_{study_name}_{time.time()}_threads{njobs}.csv')
+
+    print(study.data_frame())
+    study.data_frame().to_csv(f'./optuna_data/global/DFstudy_{study_name}_{time.time()}_thread{njobs}.csv')
 
 if __name__ == "__main__":
     # data
@@ -204,11 +205,11 @@ if __name__ == "__main__":
     else:
         thread_amount = int(sys.argv[1])
 
-    study_name = f'deepfm_{subject}_{str(int(time.time()))}_{sys.argv[1]}threads_study'
+    study_name = f'deepfm_{subject}_{str(int(time.time()))}_threads{thread_amount}'
 
     # GET DATA
     data_list = []
-    for t in range(5):
+    for t in range(OPTIONS['n_datasets']):
         data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, t)
         data_list += [[data, linear_feature_columns, dnn_feature_columns]]
 
@@ -219,30 +220,10 @@ if __name__ == "__main__":
         load_if_exists=False)
 
     start = time.time()
-
-    #define threads
-    thread_list = []
-    for i in range(thread_amount):
-        try:
-            thread_list += [threading.Thread(target=run_optuna, args=(data_list, i, study_name))]
-        except:
-            print(f'unable to create thread {i}')
-
-    #start defined threads
-    for id, thread in enumerate(thread_list):
-        try:
-            thread.start()
-        except:
-            print('unable to start thread {id}')
-    
-    for thread_entity in thread_list:
-        thread_entity.join()
+    run_optuna(data_list, study_name, thread_amount)
 
     finish = time.time() - start
     time_dict = {'delta':finish}
     print(finish)
-    pd.DataFrame.from_dict(time_dict.items()).to_csv(f'./optuna_data/global/DELTA_{study_name}_threads{int(sys.argv[1])}_{time.time()}')
-
-
+    #pd.DataFrame.from_dict(time_dict.items()).to_csv(f'./optuna_data/global/DELTA_{study_name}_threads{int(sys.argv[1])}_{time.time()}')
     print('EVERYTHING HAS FINISHED')
-    #run_optuna(data, linear_feature_columns, dnn_feature_columns)
