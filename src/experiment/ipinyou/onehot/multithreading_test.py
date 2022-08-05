@@ -10,6 +10,7 @@ from deepctr_torch.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.metrics import log_loss, roc_auc_score
 import pandas as pd
 from math import ceil
+import datetime
 
 import torch
 import torch.nn as nn
@@ -17,6 +18,12 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data
 import copy
+
+OPTIONS = {
+    'n_datasets': 2,
+    'DEVICE': torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+}
+global_data_list = []
 
 def create_directiories(dirs = [f'./mt_data/threads_{sys.argv[1]}', './models_mt']):
     for dir in dirs:
@@ -36,7 +43,7 @@ def train_evalute_model(subject, X, y , linear_feature_columns, dnn_feature_colu
     if properties['define_new_model']:
         model = DeepFM(
             linear_feature_columns = linear_feature_columns,
-            dnn_feature_columns=dnn_feature_columns, 
+            dnn_feature_columns= dnn_feature_columns, 
             dnn_hidden_units=properties['hidden_layer_sizes'], 
             task='binary',
             l2_reg_embedding=properties['l2_reg'], 
@@ -83,24 +90,43 @@ def train_evalute_model(subject, X, y , linear_feature_columns, dnn_feature_colu
 
     
 
-def run_learning_thread(data, l, d, i, nn_params):
+def run_learning_thread(data_list, experiment_id, thread_id, nn_params):
     start = time.time()
     nn_params = copy.deepcopy(nn_params)
-    
-    for _ in range(nn_params["reduce_lr_times"]):
-        if _ > 0:
-            nn_params["define_new_model"] = False
-            nn_params['learning_rate_init'] = nn_params['learning_rate_init']*nn_params["reduce_lr_value"]
+    total_auc = 0.0
+    count = 0
+    for (data, l, d) in data_list:
+        for _ in range(nn_params["reduce_lr_times"]):
+            if _ > 0:
+                nn_params["define_new_model"] = False
+                nn_params['learning_rate_init'] = nn_params['learning_rate_init']*nn_params["reduce_lr_value"]
+                
+            results = train_evalute_model(X={"train":data['X_train'], "test": data['X_test'], "vali": data['X_vali']},
+                            y={'train': data['y_train'], 'test': data['y_test'], "vali": data['y_vali']},
+                            subject=i, 
+                            linear_feature_columns = l[0], 
+                            dnn_feature_columns = d[0], id=i, **nn_params)
             
-        results = train_evalute_model(X={"train":data['X_train'], "test": data['X_test'], "vali": data['X_vali']},
-                        y={'train': data['y_train'], 'test': data['y_test'], "vali": data['y_vali']},
-                        subject=i, 
-                        linear_feature_columns = l[0], 
-                        dnn_feature_columns = d[0], id=i, **nn_params)
+            total_auc += results["BEST_TEST_AUC"]
+            count += 1
+
+    mean_auc = total_auc/count
                     
     save_data = results | nn_params
     
-    total_time = time.time() - start
+    finish = time.time()
+    total_time = finish - start
+    experiment_data = {
+        "experiment_id": experiment_id, 
+        "thread_id": thread_id, 
+        "start": datetime.datetime.fromtimestamp(start).strftime('%c'),
+        "start": datetime.datetime.fromtimestamp(finish).strftime('%c'),
+        'auc': mean_auc}
+    
+    results_to_be_saved = experiment_data | nn_params
+
+    global_data_list.append(results_to_be_saved)
+
     print(f'time elapsed: {total_time}')
     save_data['delta'] = total_time
     pd.DataFrame.from_dict(save_data.items()).to_csv(f'./mt_data/threads_{sys.argv[1]}/{time.time()}_thread{id}.csv')
@@ -116,13 +142,14 @@ if __name__ == "__main__":
         thread_amount = 1
     else:
         thread_amount = int(sys.argv[1])
-    
+
     experiment_name = f'experiment_{subject}_{time.time()}_threads{thread_amount}'
     # GET DATA
+
     data_list = []
-    for t in range(thread_amount):
+    for t in range(OPTIONS['n_datasets']):
         data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, t)
-        data_list += [data, linear_feature_columns, dnn_feature_columns]
+        data_list += [[data, linear_feature_columns, dnn_feature_columns]]
     
     experiments = generate_space([
         # advertiser ids
@@ -132,7 +159,7 @@ if __name__ == "__main__":
         # '1458', '3358', '3476', '2259', '2261', '2821', '2997'
         # '2821', '2997', '2261', '2259', ?'3476'
         # sample_ids
-        list(range(5)),
+        list(range(1)),
         # bins
         # [1, 5, 10, 50, 150, 300],
         # alpha
@@ -148,10 +175,6 @@ if __name__ == "__main__":
     ],
         # starting experiment id (you can skip start=N experiments in case of error)
         start=0) #240(alpha) #126(width), 
-
-    print(experiments)
-    print(len(experiments))
-    print(ceil(len(experiments)/thread_amount))
 
     loops = ceil(len(experiments)/thread_amount)
     rest = len(experiments)%thread_amount
@@ -177,6 +200,7 @@ if __name__ == "__main__":
                     "reduce_lr_value": 0.1,
                     "define_new_model": True
                 }
+
     project_start = time.time()
     for loop in range(loops):
         if loop != loops-1:
@@ -185,9 +209,10 @@ if __name__ == "__main__":
         else:
             thread_count = thread_amount if rest == 0 else rest
             #print(experiments[loop*thread_amount+thread])
-        print(f'LLOP: {loop}')
+        print(f'LOOP: {loop}')
         #define threads
         thread_list = []
+        
         for i in range(thread_count):
             try:
                 experiment_id, (subject, sample_id, alpha, lr, hidden, dnn_dropout,l2_reg) = experiments[loop*thread_amount+i]
@@ -198,7 +223,7 @@ if __name__ == "__main__":
                     "dnn_dropout": dnn_dropout,
                     "l2_reg": l2_reg}
                 params = nn_params | hyperparameters
-                thread_list += [threading.Thread(target=run_learning_thread, args=(data_list[i][0], data_list[i][1], data_list[i][2], experiment_id, params))]
+                thread_list += [threading.Thread(target=run_learning_thread, args=(data_list, experiment_id, i, params))]
             except:
                 print(f'unable to create thread {experiment_id}')
 
@@ -212,39 +237,10 @@ if __name__ == "__main__":
         for thread_entity in thread_list:
             thread_entity.join()
 
-        project_eval = time.time() - project_start
+    project_eval = time.time() - project_start
 
-        print(f'evaluations took: {project_eval}')
-        delta_dict = {"global_delta": project_eval}
-        pd.DataFrame.from_dict(delta_dict.items()).to_csv(experiment_name)
-
-
-'''
-for experiment_id, (sample_id, alpha, lr, hidden, dnn_dropout, l2_reg) in experiments:
-        print(f"EXPERIMENT {experiment_id}/{len(experiments) + experiments[0][0]}, data={(sample_id, alpha, lr, hidden, dnn_dropout, l2_reg)}")
-
-
-        #define threads
-        thread_list = []
-        for i in range(int(sys.argv[1])):
-            try:
-                thread_list += [threading.Thread(target=run_learning_thread, args=(data, linear_feature_columns, dnn_feature_columns, i))]
-            except:
-                print(f'unable to create thread {i}')
-
-        #start defined threads
-        for id, thread in enumerate(thread_list):
-            try:
-                thread.start()
-
-            except:
-                print('unable to start thread {id}')
-        
-        for thread_entity in thread_list:
-            thread_entity.join()
-
-        print('EVERYTHING HAS FINISHED')
-        #run_learning_thread(data, linear_feature_columns, dnn_feature_columns)
-
-'''
-    
+    print(f'evaluations took: {project_eval}')
+    delta_dict = {"global_delta": project_eval}
+    pd.DataFrame.from_dict(delta_dict.items()).to_csv(experiment_name)
+    df = pd.DataFrame(global_data_list)
+    df.to_csv(f'{experiment_name}_ACTUALDATA') 
