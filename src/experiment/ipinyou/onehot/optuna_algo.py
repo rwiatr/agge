@@ -24,12 +24,12 @@ import time
 import pandas as pd
 
 OPTIONS = {
-    'n_trials': 20,
-    'n_datasets': 5,
-    'batch_size': 1500,
+    'n_trials': 24,
+    'n_datasets': 1,
+    'batch_size': 1200,
     'patience': 8,
-    'epochs': 2000,
-    'adaptive_lr_depth': 4,
+    'epochs': 2,
+    'adaptive_lr_depth': 2,
     'adaptive_lr_init': 0.01,
     'DEVICE': torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 }
@@ -188,8 +188,8 @@ def run_optuna(data_list, study_name, njobs):
     params_dict['complete_trials'] = len(complete_trials)
     pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/threads_{njobs}/study_{study_name}_{time.time()}_threads{njobs}.csv')
 
-    print(study.data_frame())
-    study.data_frame().to_csv(f'./optuna_data/global/DFstudy_{study_name}_{time.time()}_thread{njobs}.csv')
+    print(study.trials_dataframe())
+    study.trials_dataframe().to_csv(f'./optuna_data/global/DFstudy_{study_name}_{time.time()}_thread{njobs}.csv')
 
 if __name__ == "__main__":
     # data
