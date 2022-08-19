@@ -21,7 +21,7 @@ import copy
 import queue
 
 OPTIONS = {
-    'n_datasets': 2,
+    'n_datasets': 3,
     'DEVICE': torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 }
 thread_exit_flag = 0

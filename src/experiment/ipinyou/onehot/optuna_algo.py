@@ -30,7 +30,7 @@ OPTIONS = {
     'n_datasets': 3,
     'batch_size': 1200,
     'patience': 3,
-    'epochs': 1,
+    'epochs': 300,
     'adaptive_lr_depth': 2,
     'adaptive_lr_init': 0.01,
     'DEVICE': torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
