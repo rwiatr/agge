@@ -1,3 +1,4 @@
+from msilib.schema import MsiPatchHeaders
 import os, psutil, time
 import sys
 sys.path.append(os.getcwd())
@@ -17,6 +18,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data
+import torch.multiprocessing as mp
 import copy
 import queue
 
@@ -103,7 +105,6 @@ def run_learning_thread(data_list, thread_id, nn_params, global_data_list, q):
 
             start = time.time()
             nn_params = copy.deepcopy(nn_params)
-            data_list = copy.deepcopy(data_list)
             count = 0
 
             hyperparameters = {
@@ -239,13 +240,13 @@ if __name__ == "__main__":
     thread_list = []
 
     #handle queue
-    queue_lock = threading.Lock()
+    queue_lock = mp.Lock()
     work_queue = queue.Queue(len(experiments))
 
 
     for i in range(thread_amount):
         try:
-            thread_list.append(threading.Thread(target=run_learning_thread, args=(data_list, i, nn_params, global_data_list, work_queue)))
+            thread_list.append(mp.Process(target=run_learning_thread, args=(data_list, i, nn_params, global_data_list, work_queue)))
         except:
             print(f'unable to create thread {i}')
 
@@ -277,4 +278,4 @@ if __name__ == "__main__":
     pd.DataFrame.from_dict(delta_dict.items()).to_csv(experiment_name)
     df = pd.DataFrame(global_data_list)
     print(df)
-    df.to_csv(f'{experiment_name}_ACTUALDATA') 
+    df.to_csv(f'{experiment_name}_MP') 

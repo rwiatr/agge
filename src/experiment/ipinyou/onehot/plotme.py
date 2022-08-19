@@ -1,7 +1,142 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import sys
+import glob
+import datetime
+import collections
 
 if __name__ == '__main__':
+    path = './plotme3'
+    data_dict = {}
+
+    for file in glob.glob(f'{path}/*'):
+        print(file.split('_')[4])
+        data_dict[int(file.split('_')[4])] = pd.read_csv(file)
+
+    seconds_dict = {}
+    val_dict = {}
+    total_auc = 0.0
+    for k, i in data_dict.items():
+
+
+        start_dt = datetime.datetime.strptime(data_dict[k].start.iloc[0], '%c')
+        finish_dt = datetime.datetime.strptime(data_dict[k].finish.iloc[-1], '%c')
+        delta = finish_dt - start_dt
+
+        seconds_dict[k] = delta.seconds
+        val_dict[k] = data_dict[k].best_test_auc.mean()
+
+    ordered_dict = collections.OrderedDict(sorted(seconds_dict.items()))
+    ordered_dict_vals = collections.OrderedDict(sorted(val_dict.items()))
+    plt.rcParams['figure.figsize'] = (20, 5)
+    plt.plot(ordered_dict.keys(), ordered_dict.values(), label = 'delta')
+    plt.ylabel('Wartość [s]')
+    plt.xlabel('Liczba wątków')
+
+    plt.legend()
+    plt.show()
+
+    plt.plot(ordered_dict_vals.keys(), ordered_dict_vals.values(), label = 'AUC')
+    plt.ylabel('Wartość')
+    plt.xlabel('Liczba wątków')
+
+    plt.legend()
+    plt.show()
+    '''
+
+    data_dict = {}
+    path = './plotme2'
+
+    for file in glob.glob(f'{path}/*'):
+        print(file.split('_')[3][-1])
+        data_dict[file.split('_')[4][-1]] = pd.read_csv(file)
+
+    seconds_dict = {}
+    val_dict = {}
+    total_auc = 0.0
+    for k, i in data_dict.items():
+
+
+        start_dt = datetime.datetime.strptime(data_dict[k].datetime_start.iloc[0], '%Y-%m-%d %H:%M:%S.%f')
+        finish_dt = datetime.datetime.strptime(data_dict[k].datetime_complete.iloc[-1], '%Y-%m-%d %H:%M:%S.%f')
+        delta = finish_dt - start_dt
+
+        seconds_dict[k] = delta.seconds
+        val_dict[k] = data_dict[k].value.mean()
+
+    print(seconds_dict)
+    seconds_dict['4'] = 24575.974799394608
+    val_dict['4'] = 0.77542
+
+    seconds_dict['8'] = 21792.54026079178
+    val_dict['8'] = 0.77116
+
+    ordered_dict = collections.OrderedDict(sorted(seconds_dict.items()))
+    ordered_dict_vals = collections.OrderedDict(sorted(val_dict.items()))
+
+
+    plt.rcParams['figure.figsize'] = (20, 5)
+    plt.plot(ordered_dict.keys(), ordered_dict.values(), label = 'delta')
+    plt.ylabel('Wartość [s]')
+    plt.xlabel('Liczba wątków')
+
+    plt.legend()
+    plt.show()
+
+    plt.plot(ordered_dict_vals.keys(), ordered_dict_vals.values(), label = 'AUC')
+    plt.ylabel('Wartość')
+    plt.xlabel('Liczba wątków')
+
+    plt.legend()
+    plt.show()
+
+    '''
+ 
+    '''
+
+    path = './plotme'
+        data_dict = {}
+
+        for file in glob.glob(f'{path}/*'):
+            print(file.split('_')[3][-1])
+            data_dict[file.split('_')[3][-1]] = pd.read_csv(file)
+
+        seconds_dict = {}
+        val_dict = {}
+        total_auc = 0.0
+        for k, i in data_dict.items():
+
+
+            start_dt = datetime.datetime.strptime(data_dict[k].start.iloc[0], '%c')
+            finish_dt = datetime.datetime.strptime(data_dict[k].finish.iloc[-1], '%c')
+            delta = finish_dt - start_dt
+
+            seconds_dict[k] = delta.seconds
+            val_dict[k] = data_dict[k].best_test_auc.mean()
+
+        ordered_dict = collections.OrderedDict(sorted(seconds_dict.items()))
+        ordered_dict_vals = collections.OrderedDict(sorted(val_dict.items()))
+        plt.rcParams['figure.figsize'] = (20, 5)
+        plt.plot(ordered_dict.keys(), ordered_dict.values(), label = 'delta')
+        plt.ylabel('Wartość [s]')
+        plt.xlabel('Liczba wątków')
+
+        plt.legend()
+        plt.show()
+
+        plt.plot(ordered_dict_vals.keys(), ordered_dict_vals.values(), label = 'AUC')
+        plt.ylabel('Wartość')
+        plt.xlabel('Liczba wątków')
+
+        plt.legend()
+        plt.show()
+    '''
+
+
+
+
+
+    '''
     df = pd.read_pickle("results_0.pickle").explode('value')
     df.value = df.value.astype(float)
     df.n_iter_no_change = df.n_iter_no_change.astype(int)
@@ -51,3 +186,4 @@ if __name__ == '__main__':
         plt.xticks(rotation='vertical')
         plt.title("test " + subject + " SKlearn")
     plt.show()
+    '''

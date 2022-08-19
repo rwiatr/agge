@@ -22,16 +22,19 @@ from deepctr_torch.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.metrics import log_loss, roc_auc_score
 import time
 import pandas as pd
+from optuna.samplers import TPESampler, CmaEsSampler
+import copy
 
 OPTIONS = {
-    'n_trials': 24,
-    'n_datasets': 1,
+    'n_trials': 10,
+    'n_datasets': 3,
     'batch_size': 1200,
-    'patience': 8,
-    'epochs': 2,
+    'patience': 3,
+    'epochs': 1,
     'adaptive_lr_depth': 2,
     'adaptive_lr_init': 0.01,
-    'DEVICE': torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    'DEVICE': torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+    'sampler': TPESampler() # CmaEsSampler()
 }
 
 def create_directiories(dirs = [f'./optuna_data/threads_{sys.argv[1]}', './models_optuna/', f'./optuna_data/global']):
@@ -45,8 +48,8 @@ def create_directiories(dirs = [f'./optuna_data/threads_{sys.argv[1]}', './model
 
 def define_model(trial, linear_feature_columns, dnn_feature_columns):
     # We optimize the number of layers and hidden units in each layer.
-    n_layers = trial.suggest_int("n_layers", 3, 10)
-    out_features =  trial.suggest_int("n_units_l", 128, 1024)
+    n_layers = trial.suggest_int("n_layers", 3, 5)
+    out_features =  trial.suggest_int("n_units_l", 200, 500)
 
     layers = [out_features for _ in range(n_layers)]
 
@@ -113,6 +116,8 @@ def prep_data(X, y, batch_size, shuffle=False):
 
 
 def objective(trial, data_list):
+
+    data_list = copy.deepcopy(data_list)
     linear_feature_columns, dnn_feature_columns = data_list[0][1], data_list[0][2]
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -159,7 +164,8 @@ def run_optuna(data_list, study_name, njobs):
         direction="maximize",
         study_name=study_name,
         storage='sqlite:///deepfm_study.db',
-        load_if_exists=True)
+        load_if_exists=True,
+        sampler=OPTIONS['sampler'])
     
     study.optimize(lambda trial: objective(trial, data_list), n_trials=OPTIONS['n_trials'], n_jobs=njobs, timeout=None, show_progress_bar=False)
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
@@ -175,6 +181,7 @@ def run_optuna(data_list, study_name, njobs):
     trial = study.best_trial
     print("  Value: ", trial.value)
     print("  Params: ")
+    print(trial)
 
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
@@ -189,7 +196,7 @@ def run_optuna(data_list, study_name, njobs):
     pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/threads_{njobs}/study_{study_name}_{time.time()}_threads{njobs}.csv')
 
     print(study.trials_dataframe())
-    study.trials_dataframe().to_csv(f'./optuna_data/global/DFstudy_{study_name}_{time.time()}_thread{njobs}.csv')
+    study.trials_dataframe().to_csv(f'./optuna_data/global/DFstudy_{study_name}_{time.time()}_thread_{njobs}.csv')
 
 if __name__ == "__main__":
     # data

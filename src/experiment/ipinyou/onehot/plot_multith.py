@@ -12,7 +12,7 @@ if __name__ == "__main__":
     #read global data
     data = {}
     auc_dic = {}
-    path = './optuna_data/global/'
+    
 
     global_times = [0 for x in range(9)]
     

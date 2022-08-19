@@ -154,8 +154,8 @@ class DataManager:
 
         if self.new_sample:
             if subject in {'1458', '3386'}:
-                self._df_test = neg_sample(self.df_test, 0.2)
-                self._df_train = neg_sample(self.df_train, 0.2)
+                self._df_test = neg_sample(self.df_test, 0.1)
+                self._df_train = neg_sample(self.df_train, 0.1)
             else:
                 self._df_test = neg_sample(self.df_test, 0.4)
                 self._df_train = neg_sample(self.df_train, 0.4)
