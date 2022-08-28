@@ -4,14 +4,15 @@ import sys
 import glob
 import datetime
 import collections
+import seaborn as sns
 
 if __name__ == '__main__':
     path = './plotme3'
     data_dict = {}
 
     for file in glob.glob(f'{path}/*'):
-        print(file.split('_')[4])
-        data_dict[int(file.split('_')[4])] = pd.read_csv(file)
+        print(file.split('_')[6])
+        data_dict[int(file.split('_')[6])] = pd.read_csv(file)
 
     seconds_dict = {}
     val_dict = {}
@@ -19,8 +20,8 @@ if __name__ == '__main__':
     for k, i in data_dict.items():
 
 
-        start_dt = datetime.datetime.strptime(data_dict[k].start.iloc[0], '%c')
-        finish_dt = datetime.datetime.strptime(data_dict[k].finish.iloc[-1], '%c')
+        start_dt = datetime.datetime.strptime(data_dict[k].start.iloc[0], '%c') # %Y-%m-%d %H:%M:%S.%f
+        finish_dt = datetime.datetime.strptime(data_dict[k].finish.iloc[-1], '%c') # %Y-%m-%d %H:%M:%S.%f
         delta = finish_dt - start_dt
 
         seconds_dict[k] = delta.seconds
@@ -28,20 +29,39 @@ if __name__ == '__main__':
 
     ordered_dict = collections.OrderedDict(sorted(seconds_dict.items()))
     ordered_dict_vals = collections.OrderedDict(sorted(val_dict.items()))
+    df_data = pd.DataFrame(ordered_dict_vals.items(), columns = ['Liczba Wątków', 'AUC'])
+    df_delta = pd.DataFrame(ordered_dict.items(), columns = ['Liczba Wątków', 'Delta'])
+    sns.set_theme()
     plt.rcParams['figure.figsize'] = (20, 5)
-    plt.plot(ordered_dict.keys(), ordered_dict.values(), label = 'delta')
-    plt.ylabel('Wartość [s]')
-    plt.xlabel('Liczba wątków')
-
+    sns.set()
+    sns.lineplot(data= df_data, x='Liczba Wątków', y='AUC', linewidth=6, label = 'AUC')
+    plt.title('Optuna, rozpraszanie badania na wątki - AUC')
+    plt.legend()
+    plt.show()
+    plt.title('Optuna, rozpraszanie badania na wątki - Delta')
+    sns.lineplot(data= df_delta, x='Liczba Wątków', y='Delta', linewidth=6, label = 'Czas ewaluacji')
     plt.legend()
     plt.show()
 
-    plt.plot(ordered_dict_vals.keys(), ordered_dict_vals.values(), label = 'AUC')
-    plt.ylabel('Wartość')
-    plt.xlabel('Liczba wątków')
+    '''
+        plt.rcParams['figure.figsize'] = (20, 5)
+        plt.plot(ordered_dict.keys(), ordered_dict.values(), label = 'delta', linewidth=5)
+        plt.ylabel('Wartość [s]')
+        plt.xlabel('Liczba wątków')
 
-    plt.legend()
-    plt.show()
+        plt.legend()
+        plt.show()
+
+        plt.plot(ordered_dict_vals.keys(), ordered_dict_vals.values(), label = 'AUC', linewidth=5)
+        plt.ylabel('Wartość')
+        plt.xlabel('Liczba wątków')
+
+        plt.legend()
+        plt.show()
+
+    '''
+
+
     '''
 
     data_dict = {}

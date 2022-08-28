@@ -21,7 +21,7 @@ import copy
 import queue
 
 OPTIONS = {
-    'n_datasets': 3,
+    'n_datasets': 2,
     'DEVICE': torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 }
 thread_exit_flag = 0
@@ -42,7 +42,7 @@ def train_evalute_model(subject, X, y , linear_feature_columns, dnn_feature_colu
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if properties['define_new_model']:
-        model = DeepFM(
+        model = DCN(
             linear_feature_columns = linear_feature_columns,
             dnn_feature_columns= dnn_feature_columns, 
             dnn_hidden_units=properties['hidden_layer_sizes'], 
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     else:
         thread_amount = int(sys.argv[1])
 
-    experiment_name = f'experiment_{subject}_{time.time()}_threads{thread_amount}'
+    experiment_name = f'experiment_{subject}_{time.time()}_threads_{thread_amount}'
     # GET DATA
 
     data_list = []
@@ -213,7 +213,7 @@ if __name__ == "__main__":
     nn_params = {
                     #"batch_size": 1000,
                     # "power_t": 0.5,
-                    "max_iter": 500,  # implement
+                    "max_iter": 250,  # implement
                     # "shuffle": True, # always true
                     "validation_fraction": 0.2,  # implement
                     # "random_state":None,
@@ -226,7 +226,7 @@ if __name__ == "__main__":
                     "beta_2": 0.999,
                     "epsilon": 1e-8,
                     # "n_iter_no_change": 10, "max_fun": 15000
-                    "n_iter_no_change": 5,
+                    "n_iter_no_change": 3,
                     "reduce_lr_times": 3, 
                     "reduce_lr_value": 0.1,
                     "define_new_model": True

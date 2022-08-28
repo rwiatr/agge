@@ -1,5 +1,6 @@
 import os
 import sys
+from zoneinfo import available_timezones
 sys.path.append(os.getcwd())
 import threading
 
@@ -24,6 +25,7 @@ import time
 import pandas as pd
 from optuna.samplers import TPESampler, CmaEsSampler
 import copy
+import torch.multiprocessing as mp
 
 OPTIONS = {
     'n_trials': 10,
@@ -39,7 +41,7 @@ OPTIONS = {
     'subject': '3358'
 }
 
-def create_directiories(dirs = [f'./optuna_data/threads_{sys.argv[1]}', './models_optuna/', f'./optuna_data/global']):
+def create_directiories(dirs = [f'./optuna_data/threads', './models_optuna/', f'./optuna_data/global']):
     for dir in dirs:
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -117,12 +119,12 @@ def prep_data(X, y, batch_size, shuffle=False):
     return DataLoader(HandleDaset(x=X, y=y), batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
 
-def objective(trial, data_list):
+def objective(trial, data_list, device):
 
     #data_list = copy.deepcopy(data_list)
     linear_feature_columns, dnn_feature_columns = data_list[0][1], data_list[0][2]
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:{device}')
     model = define_model(trial, linear_feature_columns, dnn_feature_columns).to(device)
     #print(device)
     optimizer_name = trial.suggest_categorical("optimizer", ["Adam"])
@@ -161,7 +163,7 @@ def objective(trial, data_list):
 
     return mean_auc
 
-def run_optuna(data_list, study_name, njobs):
+def run_optuna(data_list, study_name, device):
     study = optuna.create_study(
         direction="maximize",
         study_name=study_name,
@@ -169,36 +171,8 @@ def run_optuna(data_list, study_name, njobs):
         load_if_exists=True,
         sampler=OPTIONS['sampler']())
     
-    study.optimize(lambda trial: objective(trial, data_list), n_trials=OPTIONS['n_trials'], n_jobs=njobs, timeout=None, show_progress_bar=False)
-    pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
-    complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
+    study.optimize(lambda trial: objective(trial, data_list, device), n_trials=OPTIONS['n_trials'], n_jobs=-1, timeout=None, show_progress_bar=False)
 
-    total_time = time.time() - start
-    print("Study statistics: ")
-    print("  Number of finished trials: ", len(study.trials))
-    print("  Number of pruned trials: ", len(pruned_trials))
-    print("  Number of complete trials: ", len(complete_trials))
-
-    print("Best trial:")
-    trial = study.best_trial
-    print("  Value: ", trial.value)
-    print("  Params: ")
-    print(trial)
-
-    for key, value in trial.params.items():
-        print("    {}: {}".format(key, value))
-
-    params_dict = dict(trial.params.items())
-    print(f'EXPERIMENT RUN FOR {total_time} s')
-    params_dict['delta'] = total_time
-    params_dict['study_name'] = study_name
-    params_dict['value'] = trial.value
-    params_dict['finished_trials'] = len(study.trials)
-    params_dict['complete_trials'] = len(complete_trials)
-    pd.DataFrame.from_dict(params_dict.items()).to_csv(f'./optuna_data/threads_{njobs}/study_{study_name}_{time.time()}_threads{njobs}.csv')
-
-    print(study.trials_dataframe())
-    study.trials_dataframe().to_csv(f'./optuna_data/global/OPTUNAstudy_{study_name}_threads_{njobs}.csv')
 
 if __name__ == "__main__":
     # data
@@ -209,14 +183,10 @@ if __name__ == "__main__":
     sample_id = 1
     
     create_directiories()
-
     d_mgr = DataManager()
-    if sys.argv[1] == None:
-        thread_amount = 1
-    else:
-        thread_amount = int(sys.argv[1])
+    available_gpus = torch.cuda.device_count()
 
-    study_name = f'{model}_{subject}_{sampler}_{str(int(time.time()))}_threads_{thread_amount}'
+    study_name = f'{model}_{subject}_{sampler}_{str(int(time.time()))}_processes_{available_gpus}'
 
     # GET DATA
     data_list = []
@@ -230,11 +200,20 @@ if __name__ == "__main__":
         storage='sqlite:///deepfm_study.db',
         load_if_exists=False)
 
-    start = time.time()
-    run_optuna(data_list, study_name, thread_amount)
+    available_gpus = torch.cuda.device_count()
+    devices = []
+    for cuda in range(available_gpus):
+        devices.append(cuda)
 
-    finish = time.time() - start
-    time_dict = {'delta':finish}
-    print(finish)
-    #pd.DataFrame.from_dict(time_dict.items()).to_csv(f'./optuna_data/global/DELTA_{study_name}_threads{int(sys.argv[1])}_{time.time()}')
+    processes = []
+    for device in devices:
+        p = mp.Process(target=run_optuna, args=(data_list, study_name, device)) 
+        p.start() 
+        processes.append(p)
+
+    for p in processes:
+        p.join()  
+    
+    print(main_study.trials_dataframe())
+    main_study.trials_dataframe().to_csv(f'./optuna_data/global/OPTUNAstudy_{study_name}_processes_{available_gpus}.csv')
     print('EVERYTHING HAS FINISHED')

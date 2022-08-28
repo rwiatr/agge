@@ -19,6 +19,7 @@ from experiment.ipinyou.onehot.data_manager import DataManager
 from experiment.ipinyou.onehot.model import Mlp
 from deepctr_torch.models import *
 from deepctr_torch.callbacks import EarlyStopping, ModelCheckpoint
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss, roc_auc_score
 import time
 import pandas as pd
@@ -26,17 +27,17 @@ from optuna.samplers import TPESampler, CmaEsSampler
 import copy
 
 OPTIONS = {
-    'n_trials': 10,
-    'n_datasets': 2,
-    'batch_size': 1200,
+    'n_trials': 50,
+    'n_datasets': 3,
+    'batch_size': 300,
     'patience': 3,
-    'epochs': 8,
-    'adaptive_lr_depth': 4,
+    'epochs': 300,
+    'adaptive_lr_depth': 2,
     'adaptive_lr_init': 0.01,
     'DEVICE': torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
-    'sampler': TPESampler, # TPESampler(), # CmaEsSampler()
-    'model': DeepFM, # DeepFM, #WDL #DCN
-    'subject': '3358'
+    'sampler': CmaEsSampler, # TPESampler(), # CmaEsSampler()
+    'model': LogisticRegression, # DeepFM, #WDL #DCN
+    'subject': '2259'
 }
 
 def create_directiories(dirs = [f'./optuna_data/threads_{sys.argv[1]}', './models_optuna/', f'./optuna_data/global']):
@@ -119,43 +120,18 @@ def prep_data(X, y, batch_size, shuffle=False):
 
 def objective(trial, data_list):
 
-    #data_list = copy.deepcopy(data_list)
-    linear_feature_columns, dnn_feature_columns = data_list[0][1], data_list[0][2]
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = define_model(trial, linear_feature_columns, dnn_feature_columns).to(device)
-    #print(device)
-    optimizer_name = trial.suggest_categorical("optimizer", ["Adam"])
+    solver = trial.suggest_categorical("solver", ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga'])
     alpha = trial.suggest_float("alpha", 1e-4, 1e-1, log=True)
-    
-    lr = OPTIONS['adaptive_lr_init']
+    max_iter = trial.suggest_int("max_iter", 500, 20000)
+
     mean_auc = 0.0
 
-    for (id, (data, lfc, dfc)) in enumerate(data_list):
-        mdckpt = ModelCheckpoint(filepath=f'./models_optuna/model_cmd{trial.number}_{id}.ckpt', monitor='val_binary_crossentropy', verbose=1, save_best_only=True, mode='min')
-        #es = EarlyStopping(monitor='val_binary_crossentropy', min_delta=0, verbose=1, patience=OPTIONS['patience'], mode='min')
+    for (id, (X_train_agge, y_train, X_test_agge, y_test)) in enumerate(data_list):
+        
+        lr = LogisticRegression(max_iter=max_iter, verbose=1, solver=solver, C=1. / alpha / 1000000).fit(X_train_agge, y_train)
+        y_pred_proba = lr.predict_proba(X_test_agge)[::,1]
+        auc = roc_auc_score(y_test, y_pred_proba)
 
-        for i in range(OPTIONS['adaptive_lr_depth']):
-            if i != 0:
-                model = torch.load(f'./models_optuna/model_cmd{trial.number}_{id}.ckpt')
-                
-            optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr, weight_decay=alpha)
-            model.compile(optimizer=optimizer,
-                    loss='binary_crossentropy', metrics = ['binary_crossentropy', 'auc'])
-
-            model.fit(
-                    x=data['X_train'], 
-                    y=data['y_train'], 
-                    batch_size=OPTIONS['batch_size'], 
-                    epochs=OPTIONS['epochs'], 
-                    verbose=0,
-                    validation_data=(data['X_vali'], data['y_vali']),
-                    shuffle=False,
-                    callbacks=[mdckpt])
-
-            model_best = torch.load(f'./models_optuna/model_cmd{trial.number}_{id}.ckpt')
-            auc = round(roc_auc_score(data['y_test'], model_best.predict(data['X_test'], 256)), 4)
-            lr = lr * 0.1
         mean_auc += auc
     mean_auc = mean_auc/len(data_list)
 
@@ -221,8 +197,8 @@ if __name__ == "__main__":
     # GET DATA
     data_list = []
     for t in range(OPTIONS['n_datasets']):
-        data, linear_feature_columns, dnn_feature_columns = d_mgr.get_data_deepfm(subject, t)
-        data_list += [[data, linear_feature_columns, dnn_feature_columns]]
+        X_train, y_train, X_test, y_test, X_train_agge, X_test_agge, linear_feature_columns_list, dnn_feature_columns_list, model_inputs, = d_mgr.get_data(subject, bins, sample_id)
+        data_list += [[X_train_agge, y_train, X_test_agge, y_test]]
 
     main_study = optuna.create_study(
         direction="maximize",

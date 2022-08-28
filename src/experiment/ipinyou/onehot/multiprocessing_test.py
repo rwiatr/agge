@@ -9,6 +9,7 @@ from experiment.ipinyou.onehot.run import generate_space
 from deepctr_torch.models import *
 from deepctr_torch.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.metrics import log_loss, roc_auc_score
+from sklearn.linear_model import LogisticRegression
 import pandas as pd
 from math import ceil
 import datetime
